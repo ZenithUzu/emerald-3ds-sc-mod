@@ -80,3 +80,35 @@ checked against the same CRCs and ABI. `tools/build_web_payload.py --synthetic
 DIR` writes a synthetic payload and "ROM" to exercise it without game data.
 
 Tests: `python -m unittest discover -s builder/tests` (synthetic data only).
+# CXI para Azahar y mod Una Pantalla
+
+El generador incluye el subcomando `azahar`. Usa los archivos de una
+compilación del port para generar un CXI con su propio Title ID.
+Para producir esos archivos, sigue la compilación desde fuente del proyecto
+con tu ROM del idioma correspondiente y compila con `EMBED_DATA=1`.
+El directorio indicado con `--port` debe contener `emerald3ds.elf`,
+`emerald3ds.smdh`, `romfs/` y las plantillas de este fork.
+
+Desde la raíz del repositorio, con Python y makerom disponibles:
+
+```sh
+python builder/emerald3ds-builder.py azahar --port 3ds_port --output dist/azahar --mod
+```
+
+- Sin `--mod`, se genera el CXI con el mod desactivado.
+- Con `--mod`, también se genera `load/mods/<Title ID>/romfs`. Copia
+  `load` al directorio de usuario de Azahar para instalarlo en otro dispositivo.
+- `--install-mod` detecta Azahar o Azahar+ en el PC y copia el mod.
+  Si hay varias instalaciones o usas una portátil, pasa
+  `--azahar-dir RUTA` con la ruta que contiene su carpeta `config`.
+- `--makerom RUTA` permite indicar un ejecutable fuera de PATH.
+- `--title-key emerald-es` mantiene el mismo ID entre compilaciones de esa
+  variante. Si omites la clave, el ID se deriva del ELF de entrada.
+  Usa claves distintas si quieres conservar dos variantes lado a lado.
+
+Una Pantalla usa el idioma de cada compilación de Emerald. Admite inglés,
+español, francés, italiano, portugués brasileño, alemán y japonés. En Azahar,
+para usar el táctil sobre la imagen, selecciona el diseño personalizado,
+superpone ambas pantallas con el mismo rectángulo y pon la opacidad de la
+segunda capa al 0 %. En Android, coloca las coordenadas personalizadas en
+`[Layout]` en `config/config.ini` y juega en horizontal.

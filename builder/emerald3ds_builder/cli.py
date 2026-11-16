@@ -14,7 +14,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from . import __version__, followers, pak
+from . import __version__, azahar, followers, pak
 from .build import Payload, build_pack, default_payload, select_payload
 from .errors import BuilderError
 from .install import APP_DIR, find_sd_cards, install
@@ -133,10 +133,11 @@ def main(argv=None) -> int:
     v = sub.add_parser("verify", help="check a data pack against this release")
     v.add_argument("--pak", required=True)
     sub.add_parser("detect", help="list SD cards that look like a 3DS card")
+    azahar.register(sub.add_parser("azahar", help="package a compiled port as an Azahar CXI"))
     args = ap.parse_args(argv)
     try:
         return {"build": cmd_build, "install": cmd_install, "verify": cmd_verify,
-                "detect": cmd_detect}[args.cmd](args)
+                "detect": cmd_detect, "azahar": azahar.run}[args.cmd](args)
     except BuilderError as exc:
         sys.stdout.write("\n")
         print("Error: %s" % exc, file=sys.stderr)

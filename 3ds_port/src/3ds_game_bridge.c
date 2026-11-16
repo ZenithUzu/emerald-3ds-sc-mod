@@ -47,7 +47,7 @@ u16 Platform_GetKeyInput(void)
 
     /* Y is the 3DS's own SELECT: the registered item, as the bottom screen's
      * Y button says. */
-    if (input->physicalHeld & CTR_KEY_Y)
+    if ((input->physicalHeld & CTR_KEY_Y) && !CtrBottom_PeekTop())
         held |= SELECT_BUTTON;
     /* In the battle scene L slows and R speeds the battle up, and the game
      * sees neither. With the game's L=A button mode L stays A, and R alone

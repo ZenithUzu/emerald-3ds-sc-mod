@@ -206,8 +206,23 @@ static const u8 *SpeedText(void)
     return text;
 }
 
+static const char *const sPauseStyles[] = {
+    CTR_TEXT("HEX", "HEXÁGONOS", "HEXAGONES", "ESAGONI", "HEXÁGONOS", "SECHSECKE", "ろっかく"),
+    CTR_TEXT("RADIAL", "RADIAL", "RADIAL", "RADIALE", "RADIAL", "RADIAL", "えんけい"),
+    CTR_TEXT("CLASSIC", "CLÁSICO", "CLASSIQUE", "CLASSICO", "CLÁSSICO", "KLASSISCH", "クラシック"),
+};
+static const char *const sBattleStyles[] = {CTR_TEXT("COMPACT", "COMPACTO", "COMPACT", "COMPATTO", "COMPACTO", "KOMPAKT", "コンパクト"),
+                                          CTR_TEXT("PANELS", "PANELES", "PANNEAUX", "PANNELLI", "PAINÉIS", "TAFELN", "パネル")};
+static const char *const sPauseDimming[] = {"15%", "30%", "45%", "60%", "75%"};
+
 const CtrExtra gCtrExtras[] =
 {
+    {CTR_EXTRAS_SCREEN(CTR_EXTRAS_OPTIONS, 1), CTR_TEXT("SINGLE SCREEN", "PANTALLA ÚNICA", "ÉCRAN UNIQUE", "SCHERMO UNICO", "TELA ÚNICA", "EIN BILDSCHIRM", "1がめん"), "mod_single_screen", 2, 1, gCtrExtrasOffOn, NULL, NULL, NULL},
+    {CTR_EXTRAS_SCREEN(CTR_EXTRAS_OPTIONS, 1), CTR_TEXT("TOUCH ON TOP", "TÁCTIL ARRIBA", "TACTILE EN HAUT", "TOCCO IN ALTO", "TOQUE EM CIMA", "TOUCH OBEN", "うえの タッチ"), "mod_touch_top", 2, 1, gCtrExtrasOffOn, NULL, NULL, NULL},
+    {CTR_EXTRAS_SCREEN(CTR_EXTRAS_OPTIONS, 1), CTR_TEXT("PAUSE MENU", "MENÚ DE PAUSA", "MENU PAUSE", "MENU PAUSA", "MENU PAUSA", "PAUSENMENÜ", "ポーズ メニュー"), "mod_pause_ui", 3, 0, sPauseStyles, NULL, NULL, NULL},
+    {CTR_EXTRAS_SCREEN(CTR_EXTRAS_OPTIONS, 1), CTR_TEXT("BATTLE UI", "INTERFAZ COMBATE", "UI COMBAT", "UI LOTTA", "UI BATALHA", "KAMPF UI", "バトル UI"), "mod_battle_ui", 2, 0, sBattleStyles, NULL, NULL, NULL},
+    {CTR_EXTRAS_SCREEN(CTR_EXTRAS_OPTIONS, 1), CTR_TEXT("PAUSE DIM", "FONDO OSCURO", "FOND SOMBRE", "SFONDO SCURO", "FUNDO ESCURO", "ABDUNKELN", "はいけい"), "mod_pause_dim", 5, 2, sPauseDimming, NULL, NULL, NULL},
+    {CTR_EXTRAS_SCREEN(CTR_EXTRAS_OPTIONS, 1), CTR_TEXT("PAUSE STATUS", "ESTADO EN PAUSA", "INFOS EN PAUSE", "INFO IN PAUSA", "DADOS NA PAUSA", "PAUSENSTATUS", "ポーズ じょうほう"), "mod_pause_hud", 2, 1, gCtrExtrasOffOn, NULL, NULL, NULL},
     /* Features add their lines here. */
     {CTR_EXTRAS_SCREEN(CTR_EXTRAS_OPTIONS, 1), CTR_TEXT("3D WORLD", "MUNDO 3D", "MONDE 3D", "MONDO 3D", "MUNDO 3D", "3D-WELT", "3D ワールド"), "voxel_stereo", 3, 0, sVoxelStereo, NULL, NULL, NULL},
     {CTR_EXTRAS_SCREEN(CTR_EXTRAS_OPTIONS, 1), CTR_TEXT("3D DEPTH", "PROFUNDIDAD 3D", "PROFONDEUR 3D", "PROFOND. 3D", "PROFUNDIDADE 3D", "3D-TIEFE", "3D おくゆき"), "voxel_depth", 7, 3, sVoxelDepths, NULL, NULL, NULL},

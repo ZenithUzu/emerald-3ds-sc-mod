@@ -54,6 +54,14 @@ static const OptRowDef sRowsSystem[] = {
     EXTRA_ROW("audio_clock"),
     GAME_ROW(OPT_FPS, CTR_TEXT("SHOW FPS", "MOSTRAR FPS", "AFFICH. FPS", "MOSTRA FPS", "MOSTRAR FPS", "FPS ZEIGEN", "FPS ひょうじ")),
 };
+static const OptRowDef sRowsMod[] = {
+    EXTRA_ROW("mod_single_screen"),
+    EXTRA_ROW("mod_touch_top"),
+    EXTRA_ROW("mod_pause_ui"),
+    EXTRA_ROW("mod_battle_ui"),
+    EXTRA_ROW("mod_pause_dim"),
+    EXTRA_ROW("mod_pause_hud"),
+};
 static const OptRowDef sRows3d[] = {
     GAME_ROW(OPT_VOXEL, "VOXEL 3D"),
     EXTRA_ROW("voxel_stereo"),
@@ -132,6 +140,7 @@ static const OptRowDef sRowsItems[] = {
 static const OptGroupDef sGroupsGeneral[] = {
     GROUP(CTR_TEXT("INTERFACE", "INTERFAZ", "INTERFACE", "INTERFACCIA", "INTERFACE", "OBERFLÄCHE", "がめん"), sRowsUi),
     GROUP(CTR_TEXT("SYSTEM", "SISTEMA", "SYSTÈME", "SISTEMA", "SISTEMA", "SYSTEM", "システム"), sRowsSystem),
+    GROUP(CTR_TEXT("MOD", "MOD", "MOD", "MOD", "MOD", "MOD", "モッド"), sRowsMod),
 };
 static const OptGroupDef sGroupsWorld[] = {
     GROUP("3D", sRows3d),
@@ -188,7 +197,8 @@ static bool8 RowExists(const OptRowDef *def)
     if (def->type == ROW_GAME)
         return OptionExists(def->game);
     if (def->type == ROW_EXTRA)
-        return ExtraByKey(def->key) != NULL;
+        return (strncmp(def->key, "mod_", 4) != 0 || CtrSettings_ScreenModInstalled())
+            && ExtraByKey(def->key) != NULL;
     return TRUE;
 }
 

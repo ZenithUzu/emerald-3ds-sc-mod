@@ -137,6 +137,8 @@ bool CtrSettings_RunAlways(void);
 void CtrSettings_SetRunAlways(bool on);
 /* Settings kept by key (the OPTIONS pages of 3ds_extras.c). */
 int CtrSettings_GetInt(const char *key, int fallback);
+bool CtrSettings_ScreenModInstalled(void);
+bool CtrSettings_SingleScreen(void);
 void CtrSettings_SetInt(const char *key, int value);
 /* Fast-forward: game frames per shown frame in halves, 2 (1x) to 8 (4x),
  * 3 being 1.5x (OPTIONS, ZR/ZL). */

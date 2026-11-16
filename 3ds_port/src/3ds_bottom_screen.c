@@ -22,6 +22,12 @@ static u16 *Framebuffer(void)
  * 3DS the copy is most of what presenting a redraw costs, and the slow-redraw
  * log splits the two (CtrBottom_LastBlitTicks). */
 static u64 sCopyTicks, sFlushTicks;
+static uint32_t sBufferRevision;
+
+uint32_t CtrBottom_BufferRevision(void)
+{
+    return sBufferRevision;
+}
 
 void CtrBottom_LastBlitTicks(uint64_t *copy, uint64_t *flush)
 {
@@ -41,6 +47,7 @@ void CtrBottom_Blit(const uint16_t *canvas, int x0, int x1)
            (size_t)(x1 - x0) * CTR_BOTTOM_HEIGHT * sizeof(u16));
     t1 = svcGetSystemTick();
     GSPGPU_FlushDataCache(fb + x0 * CTR_BOTTOM_HEIGHT, (u32)(x1 - x0) * CTR_BOTTOM_HEIGHT * sizeof(u16));
+    ++sBufferRevision;
     sCopyTicks = t1 - t0;
     sFlushTicks = svcGetSystemTick() - t1;
 }
@@ -66,6 +73,7 @@ void CtrBottom_BlitRect(const uint16_t *canvas, int x0, int y0, int x1, int y1)
     t1 = svcGetSystemTick();
     /* Only the columns written: [x0, x1) is one range of the framebuffer. */
     GSPGPU_FlushDataCache(fb + x0 * CTR_BOTTOM_HEIGHT, (u32)(x1 - x0) * CTR_BOTTOM_HEIGHT * sizeof(u16));
+    ++sBufferRevision;
     sCopyTicks = t1 - t0;
     sFlushTicks = svcGetSystemTick() - t1;
 }
@@ -111,4 +119,5 @@ void CtrBottom_BlitDim(const uint16_t *canvas, int level)
         }
     }
     GSPGPU_FlushDataCache(fb, (u32)(pixels * sizeof(u16)));
+    ++sBufferRevision;
 }

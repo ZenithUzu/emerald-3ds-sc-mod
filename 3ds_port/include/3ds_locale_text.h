@@ -53,6 +53,8 @@ static inline uint8_t CtrLocale_Glyph(uint32_t c)
     case '*': return 0x1B; /* Original POK*MON labels. */
     case '%': return 0x5B;
     case '&': return 0x2D;
+    case '$': case 0x20BD: return 0xB7; /* Pokémon currency glyph. */
+    case 0xFF1F: return 0xAC;
     case 0x2026: return 0xB0;
     case 0x2642: return 0xB5;
     case 0x2640: return 0xB6;

@@ -18,6 +18,18 @@
 #define SETTINGS_FILE "settings.txt"
 /* Written first, then put in the file's place (WriteText). */
 #define SETTINGS_TEMP "settings.txt.tmp"
+#define SCREEN_MOD_FILE "mods/una-pantalla.ini"
+static bool sScreenModInstalled;
+
+bool CtrSettings_ScreenModInstalled(void)
+{
+    return sScreenModInstalled;
+}
+
+bool CtrSettings_SingleScreen(void)
+{
+    return sScreenModInstalled && CtrSettings_GetInt("mod_single_screen", 1) != 0;
+}
 
 /* The voxel overworld is opt-in: the classic 2D field is the default. */
 static bool sVoxel = false;
@@ -146,8 +158,26 @@ void CtrSettings_ApplyLine(const char *line)
 
 void CtrSettings_Load(void)
 {
-    FILE *file = CtrFs_OpenData(SETTINGS_FILE, "r");
+    FILE *mod = CtrFs_OpenAsset(SCREEN_MOD_FILE);
     char line[64];
+
+    if (mod == NULL && envIsHomebrew())
+        mod = CtrFs_OpenData(SCREEN_MOD_FILE, "r");
+    sScreenModInstalled = false;
+    if (mod != NULL)
+    {
+        if (fgets(line, sizeof(line), mod))
+        {
+            line[strcspn(line, "\r\n")] = '\0';
+            sScreenModInstalled = strcmp(line, "[emerald3ds-una-pantalla-v1]") == 0;
+        }
+        if (sScreenModInstalled)
+            while (fgets(line, sizeof(line), mod))
+                if (strncmp(line, "mod_", 4) == 0)
+                    CtrSettings_ApplyLine(line);
+        fclose(mod);
+    }
+    FILE *file = CtrFs_OpenData(SETTINGS_FILE, "r");
 
     /* A power cut between WriteText's remove and rename leaves only the
        temp file, complete. */

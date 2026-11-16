@@ -12329,6 +12329,107 @@ static void RenderDexTop(bool stereo, float slider)
     BlendForget();
 }
 
+#define MENU_TEX_W 512
+#define MENU_TEX_H 256
+static C3D_Tex sTopMenu;
+static uint32_t sTopMenuRevision;
+static unsigned sTopMenuKind;
+
+/* The companion panels use the LCD's rotated RGB565 layout. Upload after
+ * FrameBegin, which has waited for the previous frame's bottom transfer.
+ * Menus composed by the GPU use the completed picture from that transfer. */
+static bool UploadTopMenu(bool gpuWroteBottom, unsigned kind, const u16 *overlay, uint32_t revision)
+{
+    const u16 *fb = overlay;
+
+    if (kind == CTR_OVERLAY_NONE)
+    {
+        fb = (const u16 *)gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, NULL, NULL);
+        revision = CtrBottom_BufferRevision();
+        if (!fb || gfxGetScreenFormat(GFX_BOTTOM) != GSP_RGB565_OES)
+            return false;
+    }
+    else
+        gpuWroteBottom = false;
+    if (!sTopMenu.data)
+    {
+        if (!C3D_TexInit(&sTopMenu, MENU_TEX_W, MENU_TEX_H, GPU_RGBA5551))
+            return false;
+        C3D_TexSetFilter(&sTopMenu, GPU_NEAREST, GPU_NEAREST);
+        C3D_TexSetWrap(&sTopMenu, GPU_CLAMP_TO_EDGE, GPU_CLAMP_TO_EDGE);
+    }
+    else if (!gpuWroteBottom && revision == sTopMenuRevision && kind == sTopMenuKind)
+        return true;
+    if (gpuWroteBottom)
+        GSPGPU_InvalidateDataCache(fb, CTR_BOTTOM_WIDTH * CTR_BOTTOM_HEIGHT * sizeof(*fb));
+    u16 *pixels = sTopMenu.data;
+    for (int ty = 0; ty < CTR_BOTTOM_HEIGHT; ty += 8)
+        for (int tx = 0; tx < CTR_BOTTOM_WIDTH; tx += 8)
+        {
+            u16 *tile = pixels + ((ty / 8) * (MENU_TEX_W / 8) + tx / 8) * 64;
+
+            for (int x = 0; x < 8; ++x)
+            {
+                const u16 *column = fb + (tx + x) * CTR_BOTTOM_HEIGHT + CTR_BOTTOM_HEIGHT - 1 - ty;
+
+                for (int y = 0; y < 8; ++y)
+                {
+                    u16 value = column[-y];
+                    tile[sMorton[y * 8 + x]] = (value & 0xFFC0) | ((value & 31) << 1)
+                                               | (value != 0 || kind == CTR_OVERLAY_NONE);
+                }
+            }
+        }
+    C3D_TexFlush(&sTopMenu);
+    sTopMenuRevision = revision;
+    sTopMenuKind = kind;
+    TexCacheClear();
+    return true;
+}
+
+static void DrawTopMenuEye(C3D_RenderTarget *target, unsigned kind, unsigned opacity)
+{
+    const Tex3DS_SubTexture menu = {
+        CTR_BOTTOM_WIDTH, CTR_BOTTOM_HEIGHT, 0, 1,
+        (float)CTR_BOTTOM_WIDTH / MENU_TEX_W, 1.0f - (float)CTR_BOTTOM_HEIGHT / MENU_TEX_H
+    };
+    const float scaleX = target->frameBuf.height / (float)CTR_GAME_WIDTH;
+
+    SceneOn(target);
+    C2D_ViewReset();
+    if (kind == CTR_OVERLAY_NONE)
+        C2D_DrawRectSolid(0, 0, 0, target->frameBuf.height, CTR_GAME_HEIGHT, C2D_Color32(14, 21, 30, 255));
+    else if (kind == CTR_OVERLAY_PAUSE)
+        C2D_DrawRectSolid(0, 0, 0, target->frameBuf.height, CTR_GAME_HEIGHT, C2D_Color32(3, 9, 19, opacity));
+    float width = kind == CTR_OVERLAY_BATTLE ? CTR_GAME_WIDTH / (float)CTR_BOTTOM_WIDTH : 1.0f;
+    C2D_DrawImageAt((C2D_Image){&sTopMenu, &menu},
+                    (CTR_GAME_WIDTH - CTR_BOTTOM_WIDTH * width) * 0.5f * scaleX, 0, 0, NULL, scaleX * width, 1.0f);
+    if (kind == CTR_OVERLAY_NONE && CtrSettings_GetInt("mod_touch_top", 1) != 0)
+    {
+        u32 ink = C2D_Color32(243, 246, 226, 255);
+        C2D_DrawRectSolid(5 * scaleX, 6, 0, 29 * scaleX, 28, C2D_Color32(23, 51, 65, 255));
+        C2D_DrawTriangle(11 * scaleX, 20, ink, 20 * scaleX, 12, ink, 20 * scaleX, 28, ink, 0);
+        C2D_DrawRectSolid(20 * scaleX, 17, 0, 7 * scaleX, 6, ink);
+    }
+    C2D_Flush();
+}
+
+static void DrawTopMenu(bool stereo, unsigned kind)
+{
+    C2D_Prepare();
+    C3D_DepthTest(false, GPU_ALWAYS, GPU_WRITE_COLOR);
+    C3D_SetScissor(GPU_SCISSOR_DISABLE, 0, 0, 0, 0);
+    BlendForget();
+    Blend(5, false, false);
+    C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA, GPU_ONE, GPU_ZERO);
+    unsigned dim = CtrSettings_GetInt("mod_pause_dim", 2);
+    unsigned opacity = (dim <= 4 ? dim + 1 : 3) * 38;
+    DrawTopMenuEye(sTop, kind, opacity);
+    if (stereo && sTopRight)
+        DrawTopMenuEye(sTopRight, kind, opacity);
+    BlendForget();
+}
+
 void CtrVideo_Present(void)
 {
     /* The frame's entry tick: its preparation, before FrameBegin. */
@@ -12342,6 +12443,12 @@ void CtrVideo_Present(void)
     bool wanted = BottomScreen(sCentredRequested) && !sStageRequested;
     bool native = BottomNative(sCentredRequested);
     bool bottom = BottomReady(wanted && !native);
+    bool gpuWroteBottom = sBottomInUse;
+    const u16 *overlay;
+    uint32_t overlayRevision;
+    unsigned overlayKind = CtrBottom_TopOverlay(&overlay, &overlayRevision);
+    bool menuOnTop = CtrSettings_SingleScreen()
+                  && (overlayKind != CTR_OVERLAY_NONE || (!CtrBottom_PeekTop() && (bottom || CtrBottom_ShowOnTop())));
     /* The Pokédex drawn natively down there still has its device up here:
      * the top screen is drawn as with its picture down there (down), the
      * bottom one's picture is not. */
@@ -12366,9 +12473,12 @@ void CtrVideo_Present(void)
         sStats.route = CTR_ROUTE_BLANK;
         sStats.gapMs = sStats.arriveMs = sStats.prepMs = 0.0f;
         /* The Pokédex gone with the top still held: its frame back, once. */
-        if (sHeldTop.kept && sHoldTop && C3D_FrameBegin(C3D_FRAME_SYNCDRAW))
+        if ((menuOnTop || (sHeldTop.kept && sHoldTop)) && C3D_FrameBegin(C3D_FRAME_SYNCDRAW))
         {
-            HeldTopPutBack();
+            if (menuOnTop && UploadTopMenu(gpuWroteBottom, overlayKind, overlay, overlayRevision))
+                DrawTopMenu(sTopRight != NULL, overlayKind);
+            else if (sHeldTop.kept && sHoldTop)
+                HeldTopPutBack();
             C3D_FrameEnd(0);
         }
         else
@@ -12463,6 +12573,7 @@ void CtrVideo_Present(void)
     uint64_t waitStart = svcGetSystemTick();
     CtrVoxel_NoteFrameWait(waitStart);
     if (!C3D_FrameBegin(C3D_FRAME_SYNCDRAW)) return;
+    bool topMenuReady = menuOnTop && UploadTopMenu(gpuWroteBottom, overlayKind, overlay, overlayRevision);
     /* A late clear wiped the scene surface's kept scenery, if it was that. */
     if (ClearsRun()) sSceneCached = sSceneEmpty = false;
     /* Before anything samples what the CPU wrote since the last frame. */
@@ -12974,6 +13085,8 @@ void CtrVideo_Present(void)
             if (stereo) DrawSpeedBadge(sTopRight, speedHalves);
         }
     }
+    if (topMenuReady)
+        DrawTopMenu(stereo, overlayKind);
     /* Queued in the frame, behind the drawing into sBottom (BottomTransfer). */
     if (bottom) BottomTransfer();
     PORT_PROF_END(draw, PORT_PROF_DRAW);
@@ -13130,6 +13243,8 @@ void CtrVideo_Shutdown(void)
     if (sLogical) C3D_RenderTargetDelete(sLogical);
     if (sTop) C3D_RenderTargetDelete(sTop);
     if (sTopRight) C3D_RenderTargetDelete(sTopRight);
+    if (sTopMenu.data) C3D_TexDelete(&sTopMenu);
+    memset(&sTopMenu, 0, sizeof(sTopMenu));
     BandsRelease();
     sBandsFailed = false;
     if (sC2d) C2D_Fini();

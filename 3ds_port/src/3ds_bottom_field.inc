@@ -178,7 +178,7 @@ static void DrawMapMarks(const ViewState *s)
         CellCentre(s, s->cursorX, s->cursorY, &x, &y);
         DrawSprite(sRes.playerIcon[s->gender], 2, 2, x - 8, y - 8, sRes.playerIconPal[s->gender].c);
     }
-    if (s->pickMapsec != MAPSEC_NONE)
+    if (s->pickMapsec != MAPSEC_NONE || s->mapFly || s->mapKeys)
     {
         CellCentre(s, s->pickX, s->pickY, &x, &y);
         if (s->mapZoom && LargeCursor())
@@ -440,22 +440,28 @@ static int PickPanelWidth(u8 mapsec, u8 pos)
 /* The section under a tapped cell, as the region map's cursor finds it
  * (GetRegionMapSecIdAt), and the cell's place in it; zoomed in, the view
  * comes round it. */
-static void PickMapCell(int x, int y)
+static void PickRegionCell(int cx, int cy)
 {
-    int mx = sMapZoom ? sMapViewX + (x - MAP_ORIGIN_X) / 2 : x - MAP_ORIGIN_X;
-    int my = sMapZoom ? sMapViewY + (y - MAP_ORIGIN_Y) / 2 : y - MAP_ORIGIN_Y;
-    int cx = mx >> 3, cy = my >> 3;
-    u16 mapsec = mx >= 0 && my >= 0 ? GetRegionMapSecIdAt(cx, cy) : MAPSEC_NONE;
+    u16 mapsec = GetRegionMapSecIdAt(cx, cy);
 
+    sPickX = cx;
+    sPickY = cy;
     sPickMapsec = MAPSEC_NONE;
     if (mapsec == MAPSEC_NONE)
         return;
     sPickMapsec = mapsec;
-    sPickX = cx;
-    sPickY = cy;
     sPickPos = CtrRegionMap_PosWithinMapSec(cx, cy, mapsec);
     if (sMapZoom)
         MapZoomTo(cx, cy, PickPanelWidth(mapsec, sPickPos));
+}
+
+static void PickMapCell(int x, int y)
+{
+    int mx = sMapZoom ? sMapViewX + (x - MAP_ORIGIN_X) / 2 : x - MAP_ORIGIN_X;
+    int my = sMapZoom ? sMapViewY + (y - MAP_ORIGIN_Y) / 2 : y - MAP_ORIGIN_Y;
+
+    if (mx >= 0 && my >= 0)
+        PickRegionCell(mx / 8, my / 8);
 }
 
 /* The wild list, where the map is: a cream plate, the method's title bar
@@ -882,9 +888,10 @@ static void DrawNuzlocke(const ViewState *s)
     {
         int bx = x + 6 + i * (bw + 2);
         bool8 live = s->nuzStatus == statusOf[i], pressed = s->pressed == HIT_NUZ_STATUS + i;
+        bool8 focused = s->nuzFocus == HIT_NUZ_STATUS + i;
         bool8 enabled = s->nuzStatus >= 0;
         int by = Plate(bx, y + 22, bw, 17, !enabled ? sOffGrey : live || pressed ? sEmerald : sLight,
-                       pressed ? PLATE_STATE_PRESSED : PLATE_STATE_NORMAL);
+                       pressed ? PLATE_STATE_PRESSED : focused ? PLATE_STATE_FOCUS : PLATE_STATE_NORMAL);
 
         TextIn(Ascii(status[i]), bx, by, bw, 17, &sSmall, 'c', live || pressed || !enabled ? STYLE_WHITE : STYLE_INK, 3);
         if (enabled)
@@ -897,9 +904,10 @@ static void DrawNuzlocke(const ViewState *s)
         int bx = x + i * (sw + 3);
         bool8 chosen = mon->species && s->nuzSlot == i, fallen = (s->nuzFallen >> i) & 1;
         bool8 pressed = mon->species && s->pressed == HIT_NUZ_SLOT + i;
+        bool8 focused = s->nuzFocus == HIT_NUZ_SLOT + i;
 
         oy = Plate(bx, y, sw, 36, !mon->species || fallen ? sOffGrey : chosen || pressed ? sEmerald : sLight,
-                   pressed ? PLATE_STATE_PRESSED : PLATE_STATE_NORMAL);
+                   pressed ? PLATE_STATE_PRESSED : focused ? PLATE_STATE_FOCUS : PLATE_STATE_NORMAL);
         if (!mon->species)
             continue;
         {
@@ -920,7 +928,8 @@ static void DrawNuzlocke(const ViewState *s)
         u8 id = col ? HIT_NUZ_FAINTED : HIT_NUZ_FALLEN;
         bool8 pressed = s->pressed == id;
 
-        oy = Plate(bx, y, half, 30, pressed ? sEmerald : sLight, pressed ? PLATE_STATE_PRESSED : PLATE_STATE_NORMAL);
+        oy = Plate(bx, y, half, 30, pressed ? sEmerald : sLight,
+                   pressed ? PLATE_STATE_PRESSED : s->nuzFocus == id ? PLATE_STATE_FOCUS : PLATE_STATE_NORMAL);
         TextIn(Ascii(col ? CTR_TEXT("MARK FAINTED", "MARCAR DEBILIT.", "MARQUER K.O.", "SEGNA K.O.", "MARCAR DESMAIO", "BESIEGTE MARK.", "ひんしを きろく")
                          : CTR_TEXT("FALLEN MARK", "MARCA CAÍDO", "MARQUE TOMBÉ", "SEGNO CADUTO", "MARCA CAÍDO", "MARKE GEFALLEN", "ひんしの しるし")),
                bx, oy + 1, half, 14, &sSmall, 'c', pressed ? STYLE_WHITE : STYLE_INK, 4);

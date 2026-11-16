@@ -2285,7 +2285,7 @@ typedef struct
     u8 mapsec, cursorX, cursorY, pickMapsec, pickX, pickY;
     u8 mapZoom, pickType, pickPos, landmarks;
     s16 mapViewX, mapViewY;
-    u8 mapFly, flyFrontier, flyCanFly;
+    u8 mapFly, mapKeys, flyFrontier, flyCanFly;
     u16 flyVisited;
     u8 clockShown, clockValid, clockRate, clockPhase;
     u16 clockMinute;
@@ -2314,7 +2314,7 @@ typedef struct
     /* NUZLOCKE: the area and its status (-1 none), the chosen slot, the
      * fallen ones (a bit a slot), its texts. */
     s8 nuzStatus;
-    u8 nuzSlot, nuzFallen;
+    u8 nuzSlot, nuzFallen, nuzFocus;
     u8 nuzArea[NUZ_TEXT], nuzLink[NUZ_TEXT], nuzFallenText[NUZ_TEXT], nuzFainted[NUZ_TEXT], nuzCap[NUZ_TEXT],
        nuzTotals[NUZ_TEXT];
     /* The header's Y and RUN: the registered item; bit 0 running is the
@@ -2421,8 +2421,9 @@ static u16 ExtraShownValue(const CtrExtra *extra)
 /* The keyboard focus (X) on the dock and the header, and where it is inside
  * a screen. */
 #define FOCUS_NONE 0xFF
-enum { INSIDE_NONE, INSIDE_OPTIONS, INSIDE_SAVE };
+enum { INSIDE_NONE, INSIDE_OPTIONS, INSIDE_SAVE, INSIDE_MAP, INSIDE_CARD, INSIDE_NUZLOCKE };
 static u8 sFocus = FOCUS_NONE, sInside, sOptFocus;
+static u8 sNuzFocus;
 /* Leaving the focus, the buttons stay the bottom screen's until let go:
  * the B or A that left it must not reach the game. */
 static bool8 sSwallow;
@@ -2773,6 +2774,7 @@ void CtrBattleMenu_ActionInput(u8 *cursor, bool8 safari)
     /* FIGHT on top; BAG, POKéMON and RUN in a row under it. The ball
      * button, right of FIGHT and over RUN, is reached from both. */
     bool8 ball = !safari && CtrBattle_QuickBallItem() != ITEM_NONE;
+    bool8 compact = !safari && CtrSettings_SingleScreen() && CtrExtras_Get("mod_battle_ui") == 0;
 
     gMain.newKeys &= ~DPAD_ANY;
     if (!ball)
@@ -2798,13 +2800,20 @@ void CtrBattleMenu_ActionInput(u8 *cursor, bool8 safari)
         }
         dpad = 0;
     }
-    else if (ball && (((dpad & DPAD_RIGHT) && next == 0) || ((dpad & DPAD_UP) && next == 3)))
+    else if (!compact && ball && (((dpad & DPAD_RIGHT) && next == 0) || ((dpad & DPAD_UP) && next == 3)))
     {
         sQuickBallFocus = TRUE;
         PlaySE(SE_SELECT);
         dpad = 0;
     }
-    if (dpad & DPAD_UP)
+    if (compact)
+    {
+        if ((dpad & DPAD_UP) && (next & 2)) next ^= 2;
+        else if ((dpad & DPAD_DOWN) && !(next & 2)) next ^= 2;
+        else if ((dpad & DPAD_LEFT) && (next & 1)) next ^= 1;
+        else if ((dpad & DPAD_RIGHT) && !(next & 1)) next ^= 1;
+    }
+    else if (dpad & DPAD_UP)
         next = 0;
     else if ((dpad & DPAD_DOWN) && next == 0)
         next = 2;
@@ -3257,6 +3266,7 @@ static void SnapshotNuzlocke(ViewState *s)
     SnapshotParty(s);
     s->nuzStatus = CtrNuzlockeUi_AreaStatus();
     s->nuzSlot = slot < 0 ? 0xFF : slot;
+    s->nuzFocus = sInside == INSIDE_NUZLOCKE ? sNuzFocus : 0;
     for (int i = 0; i < PARTY_SIZE; ++i)
         if (CtrNuzlockeUi_SlotFallen(i))
             s->nuzFallen |= 1 << i;
@@ -3604,6 +3614,7 @@ static void Snapshot(ViewState *s, u8 mode, u8 pressed)
             s->pickMapsec = sPickMapsec;
             s->pickX = sPickX;
             s->pickY = sPickY;
+            s->mapKeys = sInside == INSIDE_MAP;
             s->mapZoom = sMapZoom;
             if (sMapZoom)
             {
@@ -3643,6 +3654,12 @@ static void Snapshot(ViewState *s, u8 mode, u8 pressed)
     switch (s->mode)
     {
     case MODE_FIELD:
+        if (sFocus < SCR_COUNT && sInside == INSIDE_NONE && CtrExtras_Get("mod_pause_ui") < 2
+         && CtrExtras_Get("mod_pause_hud") == 1)
+        {
+            SnapshotParty(s);
+            s->money = GetMoney(&gSaveBlock1Ptr->money);
+        }
         switch (s->screen)
         {
         case SCR_CARD:
@@ -6605,10 +6622,8 @@ static bool8 InGameWindow(int x, int y)
 }
 
 /* Returns the id to show as pressed. */
-static u8 ProcessTouch(u8 mode)
+static u8 ProcessTouch(u8 mode, const CtrInput *in)
 {
-    const CtrInput *in = CtrInput_Get();
-
     if (mode != sShown.mode)
     {
         /* A touch that began on another screen does not act on this one. */
@@ -6958,6 +6973,459 @@ static void ChooseColumnItem(u8 mode, u8 item)
         if (item == SCR_OPTION)
             sOptFocus = OptionStep(0xFF, 1) == 0xFF ? 0 : OptionStep(0xFF, 1);
     }
+    else if (mode == MODE_FIELD && (item == SCR_MAP || item == SCR_CARD || item == SCR_NUZLOCKE))
+    {
+        sFocus = FOCUS_NONE;
+        sInside = item == SCR_MAP ? INSIDE_MAP : item == SCR_CARD ? INSIDE_CARD : INSIDE_NUZLOCKE;
+        sNuzFocus = 0;
+        if (item == SCR_MAP)
+        {
+            u8 x, y;
+            PlayerRegionPosition(&x, &y);
+            PickRegionCell(x, y);
+        }
+    }
+}
+
+static void MapKeys(u16 down)
+{
+    int x = sPickX + !!(down & DPAD_RIGHT) - !!(down & DPAD_LEFT);
+    int y = sPickY + !!(down & DPAD_DOWN) - !!(down & DPAD_UP);
+
+    if (x >= 0 && x < MAP_PIC_W / 8 && y >= 0 && y < MAP_PIC_H / 8
+     && (x != sPickX || y != sPickY))
+        PickRegionCell(x, y);
+}
+
+static bool8 IsNuzControl(u8 id)
+{
+    return (id >= HIT_NUZ_STATUS && id < HIT_NUZ_STATUS + 3)
+        || (id >= HIT_NUZ_SLOT && id < HIT_NUZ_SLOT + PARTY_SIZE)
+        || id == HIT_NUZ_FALLEN || id == HIT_NUZ_FAINTED;
+}
+
+static void NuzKeys(u16 down)
+{
+    const Hit *current = NULL;
+    int dx = !!(down & DPAD_RIGHT) - !!(down & DPAD_LEFT);
+    int dy = !!(down & DPAD_DOWN) - !!(down & DPAD_UP);
+    int best = 10000;
+    u8 target = 0;
+
+    for (int i = 0; i < sHitCount; ++i)
+    {
+        const Hit *hit = &sHits[i];
+        if (!IsNuzControl(hit->id))
+            continue;
+        if (hit->id == sNuzFocus)
+            current = hit;
+        if (!target)
+            target = hit->id;
+    }
+    if (!current)
+    {
+        sNuzFocus = target;
+        return;
+    }
+    target = current->id;
+    if (down & A_BUTTON)
+        NuzlockeTap(current->id);
+    for (int i = 0; i < sHitCount && (dx || dy); ++i)
+    {
+        const Hit *hit = &sHits[i];
+        int x = 2 * (hit->x - current->x) + hit->w - current->w;
+        int y = 2 * (hit->y - current->y) + hit->h - current->h;
+        int forward = dx * x + dy * y;
+        int score = forward + 3 * abs(dx * y - dy * x);
+
+        if (IsNuzControl(hit->id) && forward > 0 && score < best)
+        {
+            target = hit->id;
+            best = score;
+        }
+    }
+    MoveFocus(&sNuzFocus, target);
+}
+
+/* Pause layouts share the same controls and menu actions. */
+static const s16 sPauseNodes[SCR_COUNT][2] = {
+    {160, 44}, {213, 62}, {240, 106}, {215, 151}, {160, 172},
+    {105, 151}, {80, 106}, {107, 62}, {270, 159},
+};
+
+static bool8 TouchOnTop(void)
+{
+    return CtrSettings_SingleScreen() && CtrSettings_GetInt("mod_touch_top", 1) != 0;
+}
+
+static unsigned ScreenOverlayKind(void)
+{
+    if (!sRes.ready || !CtrSettings_SingleScreen() || CtrBottom_PeekTop())
+        return CTR_OVERLAY_NONE;
+    if (sShown.mode == MODE_FIELD && sInside == INSIDE_NONE && !sMapFly)
+    {
+        if (sFocus < SCR_COUNT && CtrExtras_Get("mod_pause_ui") < 2)
+            return CTR_OVERLAY_PAUSE;
+        if (sFocus == FOCUS_NONE && TouchOnTop() && FieldIdle())
+            return CTR_OVERLAY_SHORTCUT;
+    }
+    if (gMain.inBattle && !sShown.safari && CtrExtras_Get("mod_battle_ui") == 0
+     && sShown.mode >= MODE_BATTLE_ACTION && sShown.mode <= MODE_BATTLE_TARGET)
+        return CTR_OVERLAY_BATTLE;
+    return CTR_OVERLAY_NONE;
+}
+
+/* Azahar overlaps its invisible lower screen with the 400x240 upper one.
+ * HID reports the same point in the physical lower screen's 320x240 space. */
+static int TouchCanvasX(int x)
+{
+    return ((x * 400 + 200) / W) - (400 - W) / 2;
+}
+
+static u8 OverlayTouchHit(unsigned kind, int x, int y)
+{
+    if (kind == CTR_OVERLAY_BATTLE)
+    {
+        for (int i = 0; i < 4; ++i)
+        {
+            int bx = 124 + (i & 1) * 97, by = 190 + (i >> 1) * 24;
+            if (x < bx || x >= bx + 93 || y < by || y >= by + 21)
+                continue;
+            if (sShown.mode == MODE_BATTLE_ACTION)
+                return HIT_ACTION + i;
+            if (sShown.mode == MODE_BATTLE_MOVE)
+                return sShown.moves4.moves[i] != MOVE_NONE ? HIT_MOVE + i : HIT_NONE;
+            return sShown.targets[i].live ? HIT_TARGET + i : HIT_NONE;
+        }
+        if (x >= 6 && x < 120 && y >= 190 && y < 236)
+        {
+            if (sShown.mode != MODE_BATTLE_ACTION)
+                return HIT_CANCEL;
+            if (sShown.quickBall != ITEM_NONE)
+                return HIT_QUICK_BALL;
+        }
+        return HIT_NONE;
+    }
+    if (kind == CTR_OVERLAY_SHORTCUT)
+        return HIT_OK;
+    x = TouchCanvasX(x);
+    if (x >= 253 && x < 313 && y >= 207 && y < 234)
+        return HIT_CANCEL;
+    for (u8 i = 0; i < SCR_COUNT; ++i)
+    {
+        int dx = abs(x - sPauseNodes[i][0]), dy = abs(y - sPauseNodes[i][1]);
+        bool8 radial = CtrExtras_Get("mod_pause_ui") == 1;
+        bool8 inside = radial ? dx * dx + dy * dy <= 19 * 19 : dy <= 23 && dx <= 23 - dy / 2;
+
+        if (inside && ColumnItemAvailable(i))
+            return HIT_COLUMN + i;
+    }
+    return HIT_NONE;
+}
+
+static u8 ProcessScreenTouch(u8 mode)
+{
+    static unsigned touchKind;
+    static u8 touchMode, hit;
+    static u16 lastX, lastY;
+    static bool8 back;
+    const CtrInput *in = CtrInput_Get();
+    unsigned kind = mode == sShown.mode ? ScreenOverlayKind() : CTR_OVERLAY_NONE;
+    bool8 panel = CtrBottom_ShowOnTop() || CtrVideo_BottomInUse();
+
+    if (!TouchOnTop())
+    {
+        touchKind = CTR_OVERLAY_NONE;
+        back = FALSE;
+        return CtrSettings_SingleScreen() ? HIT_NONE : ProcessTouch(mode, in);
+    }
+    if (in->touchActive)
+    {
+        lastX = in->touchX;
+        lastY = in->touchY;
+    }
+    if (in->touchDown)
+    {
+        touchKind = kind;
+        touchMode = mode;
+        hit = kind ? OverlayTouchHit(kind, in->touchX, in->touchY) : HIT_NONE;
+        back = !kind && panel && TouchCanvasX(lastX) < -6 && lastY >= 6 && lastY < 34;
+    }
+    if (back)
+    {
+        if (in->touchUp)
+        {
+            if (touchMode == mode && !kind && TouchCanvasX(lastX) < -6 && lastY >= 6 && lastY < 34)
+            {
+                if (mode == MODE_FIELD && !sMapFly)
+                    LeaveFocus();
+                else if (mode == MODE_FIELD)
+                    CancelFlyMap();
+                else
+                    PressOnce(B_BUTTON);
+            }
+            back = FALSE;
+        }
+        return HIT_NONE;
+    }
+    if (kind || touchKind)
+    {
+        if (in->touchUp)
+        {
+            if (touchKind == kind && touchMode == mode && hit != HIT_NONE
+             && OverlayTouchHit(kind, lastX, lastY) == hit)
+            {
+                if (kind == CTR_OVERLAY_SHORTCUT)
+                    MoveFocus(&sFocus, SCR_MAP);
+                else if (kind == CTR_OVERLAY_BATTLE)
+                    Activate(hit, mode);
+                else if (hit == HIT_CANCEL)
+                    LeaveFocus();
+                else
+                    ChooseColumnItem(mode, hit - HIT_COLUMN);
+            }
+            touchKind = CTR_OVERLAY_NONE;
+        }
+        return HIT_NONE;
+    }
+    if (!panel)
+        return HIT_NONE;
+
+    CtrInput mapped = *in;
+    int x = TouchCanvasX(in->touchX);
+    if (in->touchDown && (x < 0 || x >= W))
+        return HIT_NONE;
+    mapped.touchX = x < 0 ? 0 : x >= W ? W - 1 : x;
+    return ProcessTouch(mode, &mapped);
+}
+
+static u8 PauseDirection(u8 from, u16 down)
+{
+    int dx = !!(down & DPAD_RIGHT) - !!(down & DPAD_LEFT);
+    int dy = !!(down & DPAD_DOWN) - !!(down & DPAD_UP);
+    int best = 10000;
+    u8 item = from;
+
+    for (u8 i = 0; i < SCR_COUNT; ++i)
+    {
+        int x = sPauseNodes[i][0] - sPauseNodes[from][0];
+        int y = sPauseNodes[i][1] - sPauseNodes[from][1];
+        int forward = x * dx + y * dy;
+        int across = abs(x * dy - y * dx);
+        int score = forward + across * 3;
+
+        if (forward > 0 && score < best && ColumnItemAvailable(i))
+        {
+            best = score;
+            item = i;
+        }
+    }
+    return item;
+}
+
+static void PauseNode(int x, int y, int style, bool8 selected, bool8 enabled)
+{
+    const int radius = style ? 19 : 23;
+    const u16 edge = selected ? PackRgb(255, 196, 105) : PackRgb(88, 111, 132);
+    const u16 face = selected ? PackRgb(28, 91, 83)
+                   : enabled ? PackRgb(26, 47, 66) : PackRgb(27, 33, 42);
+
+    for (int row = -radius; row <= radius; ++row)
+    {
+        int width = radius;
+        if (style)
+            while (width * width + row * row > radius * radius)
+                --width;
+        else
+            width -= abs(row) / 2;
+        FillRect(x - width, y + row, width * 2 + 1, 1, edge);
+        if (abs(row) < radius - 1 && width > 2)
+            FillRect(x - width + 2, y + row, (width - 2) * 2 + 1, 1, face);
+    }
+}
+
+static void DrawPauseOverlay(const ViewState *s, int style)
+{
+    u8 location[32];
+    char status[24];
+    const bool8 showStatus = CtrExtras_Get("mod_pause_hud") == 1;
+    const u16 header = style ? PackRgb(17, 55, 58) : PackRgb(18, 34, 52);
+
+    FillRect(7, 5, 306, 21, header);
+    if (s->mapsec != MAPSEC_NONE)
+    {
+        GetMapName(location, s->mapsec, 0);
+        TextIn(location, 10, 5, 184, 21, &sNormal, 'l', STYLE_WHITE, 4);
+    }
+    if (showStatus)
+    {
+        if (s->clockValid)
+            snprintf(status, sizeof(status), "$%lu  %02d:%02d", (unsigned long)s->money,
+                     s->clockMinute / 60, s->clockMinute % 60);
+        else
+            snprintf(status, sizeof(status), "$%lu", (unsigned long)s->money);
+        DrawStrRight(&sSmall, Ascii(status), 304, 9, TXT_WHITE, 0);
+        for (int i = 0; i < PARTY_SIZE; ++i)
+        {
+            const MonView *mon = &s->party[i];
+            if (!mon->species)
+                continue;
+            const u8 *tiles = MonIcon(mon->iconSpecies, mon->deoxys);
+            u8 pal = gMonIconPaletteIndices[mon->iconSpecies];
+            if (tiles && pal < ARRAY_COUNT(sRes.monIconPal))
+            {
+                int x = i < 3 ? 26 : 294;
+                int y = i < 3 ? 68 + 38 * i : 53 + 34 * (i - 3);
+                FillRect(x - 16, y - 15, 32, 30, header);
+                IconCentred(tiles, 4, 2 * x, 2 * y, sRes.monIconPal[pal].c, mon->fainted);
+            }
+        }
+    }
+
+    for (int i = 0; i < SCR_COUNT; ++i)
+    {
+        bool8 enabled = (s->enabled & (1u << i)) != 0;
+        int x = sPauseNodes[i][0], y = sPauseNodes[i][1];
+        const Icon *icon = &sRes.column[i];
+
+        if (!enabled && i == SCR_NUZLOCKE)
+            continue;
+        PauseNode(x, y, style, sFocus == i, enabled);
+        if (icon->tiles)
+        {
+            u16 muted[16] = {0};
+            for (int n = 1; n < 16; ++n)
+                muted[n] = (icon->pal.c[n] >> 1) & 0x7BEF;
+            DrawSpriteCentred(icon->tiles, icon->size, icon->size, x * 2, y * 2,
+                              enabled ? icon->pal.c : muted);
+        }
+    }
+    FillRect(7, 207, 306, 27, header);
+    TextIn(SectionName(sFocus), 64, 207, 192, 27, &sNormal, 'c', STYLE_WHITE, 4);
+    TextIn(Ascii(CTR_TEXT("A OPEN", "A ABRIR", "A OUVRIR", "A APRI", "A ABRIR", "A ÖFFNEN", "A ひらく")),
+           7, 207, 60, 27, &sSmall, 'c', STYLE_WHITE, 3);
+    TextIn(Ascii(CTR_TEXT("B BACK", "B VOLVER", "B RETOUR", "B INDIETRO", "B VOLTAR", "B ZURÜCK", "B もどる")),
+           253, 207, 60, 27, &sSmall, 'c', STYLE_WHITE, 3);
+}
+
+static void FooterButton(const u8 *name, int x, int y, bool8 selected)
+{
+    FillRect(x, y, 93, 21, selected ? PackRgb(245, 181, 72) : PackRgb(89, 113, 135));
+    FillRect(x + 2, y + 2, 89, 17, selected ? PackRgb(78, 56, 38) : PackRgb(35, 45, 56));
+    TextIn(name, x + 2, y, 89, 21, FitFont(&sSmall, name, 85), 'c', STYLE_WHITE, 2);
+}
+
+static void DrawBattleOverlay(const ViewState *s)
+{
+    u8 nick[POKEMON_NAME_LENGTH + 1];
+    char pp[24];
+    int selected = s->cursor;
+    const bool8 moves = s->mode == MODE_BATTLE_MOVE;
+    const bool8 target = s->mode == MODE_BATTLE_TARGET;
+
+    FillRect(0, 186, W, H - 186, PackRgb(33, 61, 73));
+    for (int y = 187; y < H; y += 4)
+        FillRect(0, y, W, 1, PackRgb(36, 67, 80));
+    FillRect(6, 190, 114, 46, PackRgb(23, 34, 45));
+    FillRect(9, 193, 108, 40, PackRgb(244, 244, 230));
+    if (target)
+        DrawStr(&sSmall, Ascii(CTR_TEXT("TARGET", "OBJETIVO", "CIBLE", "BERSAGLIO", "ALVO", "ZIEL", "あいて")), 14, 197, TXT_DARK, TXT_LIGHT);
+    else if (moves)
+    {
+        DrawStr(&sSmall, Ascii(selected == MAX_MON_MOVES
+            ? CTR_TEXT("A / B BACK", "A / B VOLVER", "A / B RETOUR", "A / B INDIETRO", "A / B VOLTAR", "A / B ZURÜCK", "A / B もどる")
+            : CTR_TEXT("MOVES", "MOVIMIENTOS", "CAPACITÉS", "MOSSE", "GOLPES", "ATTACKEN", "わざ")), 14, 197, TXT_DARK, TXT_LIGHT);
+        if (selected < MAX_MON_MOVES && s->moves4.moves[selected] != MOVE_NONE)
+        {
+            snprintf(pp, sizeof(pp), "PP %u/%u", s->moves4.currentPp[selected], s->moves4.maxPp[selected]);
+            DrawStr(&sSmall, Ascii(pp), 14, 215, TXT_DARK, TXT_LIGHT);
+            DrawTypeIcon(gBattleMoves[s->moves4.moves[selected]].type, 70, 212);
+        }
+    }
+    else
+    {
+        DrawStr(&sSmall, Ascii(CTR_TEXT("WHAT WILL IT DO?", "¿QUÉ HARÁ?", "QUE FAIRE ?", "CHE FARE?", "O QUE FARÁ?", "WAS TUN?", "どうする？")), 14, 197, TXT_DARK, TXT_LIGHT);
+        StringCopy_Nickname(nick, gBattleMons[s->battler].nickname);
+        TextIn(nick, 10, 211, s->quickBall != ITEM_NONE ? 89 : 106, 17,
+               &sSmall, 'l', STYLE_INK, 4);
+        if (s->quickBall != ITEM_NONE)
+            DrawStrRight(&sSmall, Ascii("X"), 114, 218, TXT_DARK, TXT_LIGHT);
+    }
+    for (int i = 0; i < 4; ++i)
+    {
+        const u8 *label = target ? (s->targets[i].live ? s->targets[i].nick : Ascii("---"))
+                        : moves ? (s->moves4.moves[i] != MOVE_NONE ? gMoveNames[s->moves4.moves[i]] : Ascii("---"))
+                        : ActionLabel(s->safari, i);
+        FooterButton(label, 124 + (i & 1) * 97, 190 + (i >> 1) * 24, selected == i);
+    }
+}
+
+unsigned CtrBottom_TopOverlay(const uint16_t **pixels, uint32_t *revision)
+{
+    static u16 canvas[W * H];
+    static ViewState lastView;
+    static unsigned lastKind;
+    static int lastStyle, lastFocus;
+    static uint32_t generation;
+    int style = CtrExtras_Get("mod_pause_ui");
+    unsigned kind = ScreenOverlayKind();
+
+    if (kind == CTR_OVERLAY_SHORTCUT)
+        kind = CTR_OVERLAY_NONE;
+    if (kind != CTR_OVERLAY_NONE
+     && (kind != lastKind || style != lastStyle || sFocus != lastFocus
+      || memcmp(&lastView, &sShown, sizeof(sShown)) != 0))
+    {
+        int clip[4];
+        int offset = sOX;
+        u16 *dst = sDst;
+
+        clip[0] = sClipX0;
+        clip[1] = sClipY0;
+        clip[2] = sClipX1;
+        clip[3] = sClipY1;
+        sClipX0 = sClipY0 = 0;
+        sClipX1 = W;
+        sClipY1 = H;
+        sDst = canvas;
+        sOX = 0;
+        memset(canvas, 0, sizeof(canvas));
+        if (kind == CTR_OVERLAY_PAUSE)
+            DrawPauseOverlay(&sShown, style);
+        else
+            DrawBattleOverlay(&sShown);
+        sDst = dst;
+        sOX = offset;
+        RestoreClip(clip);
+        lastView = sShown;
+        lastStyle = style;
+        lastFocus = sFocus;
+        ++generation;
+    }
+    lastKind = kind;
+    *pixels = canvas;
+    *revision = generation;
+    return kind;
+}
+
+bool CtrBottom_PeekTop(void)
+{
+    return CtrSettings_SingleScreen() && (CtrInput_Get()->physicalHeld & CTR_KEY_Y) != 0
+        && (sShown.mode == MODE_POKEDEX
+         || (gMain.inBattle && sShown.mode >= MODE_BATTLE_ACTION
+             && sShown.mode <= MODE_BATTLE_TARGET));
+}
+
+bool CtrBottom_ShowOnTop(void)
+{
+    if (!CtrSettings_SingleScreen())
+        return false;
+    if (sShown.mode >= MODE_PARTY_MENU && sShown.mode <= MODE_CARD)
+        return true;
+    if (gMain.inBattle)
+        return sShown.mode >= MODE_BATTLE_ACTION && sShown.mode <= MODE_BATTLE_TARGET;
+    return sShown.mode == MODE_FIELD
+        && (sFocus != FOCUS_NONE || sInside != INSIDE_NONE || sMapFly);
 }
 
 static void SaveKeys(u8 mode, u16 down)
@@ -6979,7 +7447,9 @@ static void ProcessKeys(u8 mode)
 {
     const CtrInput *in = CtrInput_Get();
     u16 down = in->down;
-    bool8 x = (in->physicalDown & CTR_KEY_X) != 0;
+    bool8 x = (in->physicalDown & CTR_KEY_X) != 0
+           || (CtrSettings_SingleScreen() && mode == MODE_FIELD && (down & START_BUTTON)
+               && !(in->physicalHeld & CTR_KEY_SELECT));
 
     if (sSwallow && !(in->held & CTR_KEY_GAME) && !(in->physicalHeld & (CTR_KEY_X | CTR_KEY_Y)))
         sSwallow = FALSE;
@@ -6995,10 +7465,14 @@ static void ProcessKeys(u8 mode)
             FlyFromMap();
         else if (sShown.mapFly && (down & B_BUTTON))
             CancelFlyMap();
+        else
+            MapKeys(down);
         return;
     }
     /* A tap took the screen elsewhere. */
-    if ((sInside == INSIDE_OPTIONS && sScreen != SCR_OPTION) || (sInside == INSIDE_SAVE && sScreen != SCR_SAVE))
+    if ((sInside == INSIDE_OPTIONS && sScreen != SCR_OPTION) || (sInside == INSIDE_SAVE && sScreen != SCR_SAVE)
+     || (sInside == INSIDE_MAP && sScreen != SCR_MAP) || (sInside == INSIDE_CARD && sScreen != SCR_CARD)
+     || (sInside == INSIDE_NUZLOCKE && sScreen != SCR_NUZLOCKE))
     {
         sInside = INSIDE_NONE;
         sFocus = sScreen;
@@ -7013,8 +7487,30 @@ static void ProcessKeys(u8 mode)
         }
         else if (sInside == INSIDE_OPTIONS)
             OptionKeys(down);
-        else
+        else if (sInside == INSIDE_SAVE)
             SaveKeys(mode, down);
+        else if (down & B_BUTTON)
+        {
+            sInside = INSIDE_NONE;
+            sFocus = sScreen;
+            PlaySE(SE_SELECT);
+        }
+        else if (sInside == INSIDE_NUZLOCKE && sShown.screen == SCR_NUZLOCKE)
+            NuzKeys(down);
+        else if (sInside == INSIDE_CARD && (down & A_BUTTON))
+        {
+            sCardBack = !sCardBack;
+            PlaySE(SE_SELECT);
+        }
+        else if (sInside == INSIDE_MAP)
+        {
+            if (down & A_BUTTON)
+                MapTap(sShown.clockNotice ? HIT_CLOCK_NOTICE : sShown.encView ? HIT_MAP_PAGE : HIT_MAP_ZOOM);
+            else if (down & SELECT_BUTTON)
+                MapExtrasTap(HIT_MAP_INFO);
+            else if (!sShown.encView)
+                MapKeys(down);
+        }
         return;
     }
     if (sFocus == FOCUS_NONE)
@@ -7034,6 +7530,11 @@ static void ProcessKeys(u8 mode)
         LeaveFocus();
         PlaySE(SE_SELECT);
     }
+    else if (CtrSettings_SingleScreen() && mode == MODE_FIELD && sFocus < SCR_COUNT && CtrExtras_Get("mod_pause_ui") < 2
+          && (down & DPAD_ANY))
+        MoveFocus(&sFocus, PauseDirection(sFocus, down));
+    else if (down & (L_BUTTON | R_BUTTON))
+        MoveFocus(&sFocus, ColumnStep(sFocus, (down & R_BUTTON) ? 1 : -1));
     else if (down & DPAD_LEFT)
         MoveFocus(&sFocus, ColumnStep(sFocus, -1));
     else if (down & DPAD_RIGHT)
@@ -7606,7 +8107,7 @@ void CtrBottom_Frame(void)
      * field opens it (OpenAsked), or it is dropped after four seconds. */
     if (sLeaveTo < SCR_COUNT && (mode == MODE_FIELD || mode >= MODE_BATTLE_INFO || ++sLeaveToWait > 240))
         sLeaveTo = SCR_COUNT;
-    pressed = ProcessTouch(mode);
+    pressed = ProcessScreenTouch(mode);
     ProcessKeys(mode);
     OpenAsked(mode);
     RunPlan();

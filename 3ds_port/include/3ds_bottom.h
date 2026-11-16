@@ -26,11 +26,18 @@ void CtrBottom_BlitRect(const uint16_t *canvas, int x0, int y0, int x1, int y1);
 void CtrBottom_LastBlitTicks(uint64_t *copy, uint64_t *flush);
 /* The whole canvas at level/4 of its brightness (0..4), for fades. */
 void CtrBottom_BlitDim(const uint16_t *canvas, int level);
+uint32_t CtrBottom_BufferRevision(void);
 
 /* Game side. Init before AgbMain; Frame once per frame, after input is
  * scanned and before the game reads its keys. */
 void CtrBottom_Init(void);
 void CtrBottom_Frame(void);
+/* The visible companion panels for the single-screen layout. */
+bool CtrBottom_ShowOnTop(void);
+bool CtrBottom_PeekTop(void);
+enum { CTR_OVERLAY_NONE, CTR_OVERLAY_PAUSE, CTR_OVERLAY_BATTLE, CTR_OVERLAY_SHORTCUT };
+/* RGB565 canvas in LCD order, with zero pixels transparent. */
+unsigned CtrBottom_TopOverlay(const uint16_t **pixels, uint32_t *revision);
 /* The game's soft reset: forget the game it was in (back to the title's
  * screen, no menu session, plan or focus) and let the top screen go. */
 void CtrBottom_SoftReset(void);
