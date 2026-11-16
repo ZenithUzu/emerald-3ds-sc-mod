@@ -1,25 +1,27 @@
 # Azahar Builder for Windows
 
-Open `Emerald3DS-Azahar.exe` and choose an input:
+1. Generate and extract your game with the [original Emerald 3DS builder](https://emerald-3ds.com/).
+2. Drop the extracted folder onto **Game folder or file**, or choose
+   `Emerald3DS.3dsx` using **Browse**.
+3. Set the output file under **Save CXI as** and click **Build CXI**.
 
-- **Build a CXI.** Select the compiled `emerald3ds.elf`, choose the output
-  file name and location, then click **Build CXI**.
-- **Set up the mod for an existing game.** Select the CXI built by this fork,
-  choose one or both mod destinations, then click **Set up mod**.
+This release imports official v0.5.0 Spanish data. The folder must contain
+both the original `Emerald3DS.3dsx` and `emerald3ds.pak`, either directly
+or under `3ds/emerald3ds`. The Windows app runs without Python.
 
-The app shows the generated Title ID and full output paths. The export
-writes `load/mods/<Title ID>/romfs` next to the CXI. To install on this PC,
-choose the Azahar user directory that contains `config`.
+To install the mod for an existing CXI from this fork, select that CXI
+and choose **Set up mod**. The app can export a `load` folder next to the
+CXI and install the mod into the selected Azahar user directory.
 
-Use the [source build instructions](../../README.md#building-from-source)
-to prepare the ELF for your chosen game language.
+## Build the installer from source
 
-The app uses C# and Windows Forms. To rebuild it on Windows x64 with
-.NET Framework 4.8, extract makerom for Windows and run:
+Prepare a compiled port with embedded data and the matching official pack.
+Generate the import profile, then compile the Windows Forms executable
+with .NET Framework 4.8 and [makerom](https://github.com/3DSGuy/Project_CTR/releases/tag/makerom-v0.19.0).
 
 ```bat
-builder\windows\build.cmd C:\path\to\makerom.exe
+python builder/windows/make-import-profile.py build/upstream/3ds_port C:\path\to\emerald3ds.pak official-es.zip
+builder\windows\build.cmd C:\path\to\makerom.exe official-es.zip
 ```
 
-The executable includes [makerom from Project CTR](https://github.com/3DSGuy/Project_CTR/releases/tag/makerom-v0.19.0)
-and its [MIT license](makerom-LICENSE.txt).
+The executable includes [makerom's MIT license](makerom-LICENSE.txt).

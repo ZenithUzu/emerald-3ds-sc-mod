@@ -25,14 +25,17 @@ and its separate LayeredFS mod.
 
 ### Windows graphical builder
 
-Download and open [`Emerald3DS-Azahar.exe`](https://github.com/ZenithUzu/emerald-3ds-sc-mod/releases/download/azahar-builder-windows-v2/Emerald3DS-Azahar.exe).
-Choose the compiled `emerald3ds.elf`, then use **Save CXI as** to set the
-file name and location. Click **Build CXI**. To export or install the mod for
-an existing game built by this fork, select its `.cxi` and click **Set up mod**.
-The app shows the exact output and mod paths when finished. It includes
-makerom and runs without Python.
+Open `Emerald3DS-Azahar.exe` after building the installer profile below.
+Extract your Emerald 3DS download from the official builder. Drop the
+extracted folder onto **Game folder or file**, or browse to its
+`Emerald3DS.3dsx`. Choose **Save CXI as** and click **Build CXI**.
+The app imports the original data pack from that folder. This release
+includes the import profile for **official v0.5.0 Spanish**.
 
-The executable source and build script are in [builder/windows](builder/windows).
+For an existing CXI made by this fork, select the CXI and click
+**Set up mod**. The app shows the exact game and mod paths when finished.
+
+See [builder/windows](builder/windows) for the installer source and the steps to generate a local import profile from your own game data.
 
 ### Build the game from source
 

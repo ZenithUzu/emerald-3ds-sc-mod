@@ -39,8 +39,25 @@ namespace Emerald3DS {
             panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             Controls.Add(panel);
-            Wide(panel, new Label { Text = "Choose emerald3ds.elf to build a game, or an existing Emerald CXI to add the mod.", AutoSize = true });
-            Line(panel, "Input file", port, true);
+            Wide(panel, new Label { Text = "Choose the Emerald 3DS download from the official builder, or a compatible CXI.", AutoSize = true });
+            Line(panel, "Game folder or file", port, true);
+            var chooseFolder = new Button { Text = "Choose game folder…", AutoSize = true };
+            Wide(panel, chooseFolder);
+            chooseFolder.Click += (sender, args) => {
+                using (var dialog = new FolderBrowserDialog { ShowNewFolderButton = false }) {
+                    dialog.Description = "Select the folder extracted from the official Emerald 3DS download.";
+                    if (dialog.ShowDialog(this) == DialogResult.OK) port.Text = dialog.SelectedPath;
+                }
+            };
+            Wide(panel, new Label { Text = "Folder import: official Emerald 3DS v0.5.0, Spanish.", AutoSize = true });
+            port.AllowDrop = true;
+            port.DragEnter += (sender, args) => {
+                if (args.Data.GetDataPresent(DataFormats.FileDrop)) args.Effect = DragDropEffects.Copy;
+            };
+            port.DragDrop += (sender, args) => {
+                var paths = (string[])args.Data.GetData(DataFormats.FileDrop);
+                if (paths.Length == 1) port.Text = paths[0];
+            };
             Line(panel, "Save CXI as", output, true);
             Line(panel, "Stable ID key (optional)", key, false);
             Wide(panel, export);
@@ -57,8 +74,6 @@ namespace Emerald3DS {
                 build.Text = existing ? "Set up mod" : "Build CXI";
                 output.Enabled = key.Enabled = !existing;
             };
-            var staged = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "build", "upstream", "3ds_port");
-            if (File.Exists(Path.Combine(staged, "emerald3ds.elf"))) port.Text = Path.Combine(staged, "emerald3ds.elf");
             output.Text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Emerald3DS.cxi");
             emulator.Text = FindEmulator();
             install.CheckedChanged += (sender, args) => emulator.Enabled = install.Checked;
@@ -76,7 +91,7 @@ namespace Emerald3DS {
                 try {
                     var result = await Task.Run(() => existing
                         ? SetUpMod(input, exportMod, root)
-                        : Generate(input, dest, titleKey, exportMod, root));
+                        : ImportGame(input, dest, titleKey, exportMod, root));
                     lastFolder = Path.GetDirectoryName(result.Cxi);
                     openOutput.Enabled = true;
                     status.Text = "Done · Title ID " + result.Id;
@@ -109,7 +124,7 @@ namespace Emerald3DS {
                 if (!box.Enabled) return;
                 if (box == port) {
                     using (var dialog = new OpenFileDialog {
-                        Title = "Select an Emerald build or game", Filter = "Emerald inputs (*.elf;*.cxi)|*.elf;*.cxi",
+                        Title = "Open the game inside the extracted Emerald folder", Filter = "Emerald 3DS game (*.3dsx;*.cxi)|*.3dsx;*.cxi",
                         CheckFileExists = true, AutoUpgradeEnabled = true
                     }) {
                         if (dialog.ShowDialog(this) == DialogResult.OK) box.Text = dialog.FileName;
@@ -213,6 +228,24 @@ namespace Emerald3DS {
             if (!export && emulator == null) throw new ArgumentException("Select at least one mod destination.");
             cxi = Path.GetFullPath(cxi);
             return PlaceMod(cxi, ReadId(cxi, true).ToString("X16"), export, emulator);
+        }
+
+        internal static Result ImportGame(string input, string outputFile, string key, bool export, string emulator) {
+            if (String.IsNullOrWhiteSpace(input) || String.IsNullOrWhiteSpace(outputFile))
+                throw new ArgumentException("Choose the extracted Emerald game and a CXI output file.");
+            ValidateEmulator(emulator);
+            string path = Path.GetFullPath(input);
+            string folder = File.Exists(path) ? Path.GetDirectoryName(path) : path;
+            var temp = Path.Combine(Path.GetTempPath(), "emerald-import-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(temp);
+            try {
+                using (var profile = Resource("official-es.zip"))
+                    OfficialFolder.Prepare(folder, temp, profile);
+                return Generate(Path.Combine(temp, "emerald3ds.elf"), outputFile,
+                                String.IsNullOrWhiteSpace(key) ? "emerald3ds-official-es" : key, export, emulator);
+            } finally {
+                Directory.Delete(temp, true);
+            }
         }
 
         internal static Result Generate(string input, string outputFile, string key, bool export, string emulator) {
