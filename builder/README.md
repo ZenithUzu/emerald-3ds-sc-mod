@@ -92,7 +92,8 @@ El directorio indicado con `--port` debe contener `emerald3ds.elf`,
 Desde la raíz del repositorio, con Python y makerom disponibles:
 
 ```sh
-python builder/emerald3ds-builder.py azahar --port 3ds_port --output dist/azahar --mod
+python tools/bootstrap.py --make --spanish-rom /ruta/esmeralda.gba
+python builder/emerald3ds-builder.py azahar --port build/upstream/3ds_port --output dist/azahar --mod
 ```
 
 - Sin `--mod`, se genera el CXI con el mod desactivado.

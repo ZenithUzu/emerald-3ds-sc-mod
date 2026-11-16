@@ -16,6 +16,48 @@
   <a href="https://ko-fi.com/zallax"><img src="https://img.shields.io/badge/Ko--fi-Buy_me_a_coffee-FF5E5B?style=for-the-badge&amp;logo=kofi&amp;logoColor=white" alt="Buy Zallax a coffee on Ko-fi"></a>
 </p>
 
+## Single Screen mod for Azahar
+
+This fork adds an optional single-screen pause menu, battle interface and
+touch controls to the Emerald 3DS port. The upstream web builder provides
+the original port. Use this fork's source tools to generate a compatible CXI
+and its separate LayeredFS mod.
+
+### Build the game and export the mod
+
+Set up Python, devkitPro and the host compiler as described in
+[Development](docs/DEVELOPMENT.md), and make `makerom` available on PATH.
+From the fork's root, build the language you want. For Spanish, pass your own
+supported Pokémon Esmeralda ROM:
+
+```sh
+python tools/bootstrap.py --make --spanish-rom /path/to/esmeralda.gba
+python builder/emerald3ds-builder.py azahar --port build/upstream/3ds_port --output dist/azahar --mod
+```
+
+For the other supported languages, see the [source build commands](#building-from-source).
+The menu and battle interface follow the game's language. The builder prints
+the generated Title ID and writes `Emerald3DS-<Title ID>.cxi` and
+`load/mods/<Title ID>/romfs` under `dist/azahar`.
+
+### Install in Azahar or Azahar+
+
+- **Android.** Copy the generated `load` folder into the user directory you
+  selected in Azahar. Place the CXI in your games folder and open it.
+- **PC.** Add `--install-mod` to the builder command to copy the mod into the
+  detected emulator directory. Use `--azahar-dir PATH` for a portable
+  installation or to choose between Azahar and Azahar+.
+- **Touch controls.** Select the emulator's custom layout in landscape,
+  give both screens the same rectangle and set the second layer opacity to
+  0%. Azahar's built-in top-only layout disables the Nintendo 3DS touch
+  surface. START also opens the pause menu.
+- **Updates.** Use the same `--title-key` on later builds of the same language
+  to retain the generated Title ID. The builder preserves an existing mod
+  configuration when the ID is reused.
+
+See the [builder documentation](builder/README.md#cxi-para-azahar-y-mod-una-pantalla)
+for the command options and Android configuration.
+
 ## Get the latest version — directly in your browser
 
 **Visit [emerald-3ds.com](https://emerald-3ds.com/) to generate and download the latest version from your own supported ROM. No desktop builder or source code download is required.**
