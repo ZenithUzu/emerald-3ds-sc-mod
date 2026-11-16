@@ -25,7 +25,8 @@ and its separate LayeredFS mod.
 
 ### Windows graphical builder
 
-Open `Emerald3DS-Azahar.exe`, select the compiled `build/upstream/3ds_port`
+Download and open [`Emerald3DS-Azahar.exe`](https://github.com/ZenithUzu/emerald-3ds-sc-mod/releases/download/azahar-builder-windows-v1/Emerald3DS-Azahar.exe).
+Select the compiled `build/upstream/3ds_port`
 folder and an output folder, then click **Generar CXI**. Select
 **Exportar el mod separado** to copy the mod to another device, or
 **Instalar el mod en Azahar del PC** to install it locally. The executable
