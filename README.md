@@ -25,7 +25,7 @@ and its separate LayeredFS mod.
 
 ### Windows graphical builder
 
-Download and open [`Emerald3DS-Azahar-Controller.exe`](https://github.com/ZenithUzu/emerald-3ds-sc-mod/releases/download/azahar-builder-controller-v1/Emerald3DS-Azahar-Controller.exe).
+Download and open [`Emerald3DS-Azahar-Radial.exe`](https://github.com/ZenithUzu/emerald-3ds-sc-mod/releases/download/azahar-builder-radial-v1/Emerald3DS-Azahar-Radial.exe).
 Extract your Emerald 3DS download from the official builder. Drop the
 extracted folder onto **Game folder or file**, or browse to its
 `Emerald3DS.3dsx`. Choose **Save CXI as** and click **Build CXI**.
@@ -70,8 +70,9 @@ the generated Title ID and writes `Emerald3DS-<Title ID>.cxi` and
 - **Controls.** Choose **Single Screen** with the upper screen visible, or
   keep the **Original** layout. Press START or X to open the pause menu,
   use the D-pad to navigate, A to select, and B to go back. The upper
-  screen displays the menus and keeps its stereoscopic output. In Original
-  layout the lower screen also retains its native touch controls.
+  screen displays the menus and keeps its stereoscopic output. Azahar
+  accepts touch only on the lower screen. In Original layout, the pause
+  icons also appear on that screen and can be tapped there.
 - **Updates.** Use the same `--title-key` on later builds of the same language
   to retain the generated Title ID. The builder preserves an existing mod
   configuration when the ID is reused.

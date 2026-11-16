@@ -100,5 +100,6 @@ python builder/emerald3ds-builder.py azahar --port build/upstream/3ds_port --out
 
 The mod uses the language of the selected Emerald build. In Single Screen
 mode, keep the upper screen visible. Press START or X to open the pause
-menu, navigate with the D-pad, select with A, and go back with B. Original
-layout retains native touch controls on the lower screen.
+menu, navigate with the D-pad, select with A, and go back with B. In
+Original layout, tap the pause icons on the lower screen. Azahar routes
+touch input to that screen.

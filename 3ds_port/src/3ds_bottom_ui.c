@@ -7068,6 +7068,68 @@ static unsigned ScreenOverlayKind(void)
     return CTR_OVERLAY_NONE;
 }
 
+/* Match the selectable area to the silhouette drawn by PauseNode. */
+static int PauseNodeHalfWidth(int style, int row)
+{
+    int radius = style ? 19 : 23;
+    if (abs(row) > radius) return -1;
+    if (!style) return radius - abs(row) / 2;
+    int width = radius;
+    while (width * width + row * row > radius * radius)
+        --width;
+    return width;
+}
+
+static u8 PauseTouchHit(int x, int y)
+{
+    if (x >= 253 && x < 313 && y >= 207 && y < 234)
+        return HIT_CANCEL;
+    int style = CtrExtras_Get("mod_pause_ui");
+    for (u8 i = 0; i < SCR_COUNT; ++i)
+        if (ColumnItemAvailable(i) && abs(x - sPauseNodes[i][0]) <=
+            PauseNodeHalfWidth(style, y - sPauseNodes[i][1]))
+            return HIT_COLUMN + i;
+    return HIT_NONE;
+}
+
+static u8 ProcessPauseOrNativeTouch(u8 mode)
+{
+    static bool captured;
+    static u8 hit;
+    static u16 lastX, lastY;
+    const CtrInput *in = CtrInput_Get();
+    bool pause = mode == MODE_FIELD && ScreenOverlayKind() == CTR_OVERLAY_PAUSE;
+
+    if (in->touchDown)
+    {
+        captured = pause;
+        if (captured)
+        {
+            sTouch.active = FALSE;
+            hit = PauseTouchHit(in->touchX, in->touchY);
+        }
+    }
+    if (!captured && !pause)
+        return ProcessTouch(mode, in);
+    if (captured && in->touchActive)
+    {
+        lastX = in->touchX;
+        lastY = in->touchY;
+    }
+    if (captured && in->touchUp)
+    {
+        captured = false;
+        if (pause && hit == PauseTouchHit(lastX, lastY))
+        {
+            if (hit == HIT_CANCEL)
+                LeaveFocus();
+            else if (hit >= HIT_COLUMN && hit < HIT_COLUMN + SCR_COUNT)
+                ChooseColumnItem(mode, hit - HIT_COLUMN);
+        }
+    }
+    return HIT_NONE;
+}
+
 static u8 PauseDirection(u8 from, u16 down)
 {
     int dx = !!(down & DPAD_RIGHT) - !!(down & DPAD_LEFT);
@@ -7101,12 +7163,7 @@ static void PauseNode(int x, int y, int style, bool8 selected, bool8 enabled)
 
     for (int row = -radius; row <= radius; ++row)
     {
-        int width = radius;
-        if (style)
-            while (width * width + row * row > radius * radius)
-                --width;
-        else
-            width -= abs(row) / 2;
+        int width = PauseNodeHalfWidth(style, row);
         FillRect(x - width, y + row, width * 2 + 1, 1, edge);
         if (abs(row) < radius - 1 && width > 2)
             FillRect(x - width + 2, y + row, (width - 2) * 2 + 1, 1, face);
@@ -7239,6 +7296,7 @@ unsigned CtrBottom_TopOverlay(const uint16_t **pixels, uint32_t *revision)
     static unsigned lastKind;
     static int lastStyle, lastFocus;
     static uint32_t generation;
+    static uint32_t lowerRevision, lowerGeneration;
     int style = CtrExtras_Get("mod_pause_ui");
     unsigned kind = ScreenOverlayKind();
 
@@ -7272,6 +7330,15 @@ unsigned CtrBottom_TopOverlay(const uint16_t **pixels, uint32_t *revision)
         lastFocus = sFocus;
         ++generation;
     }
+    if (kind == CTR_OVERLAY_PAUSE &&
+        (lastKind != kind || lowerRevision != CtrBottom_BufferRevision() || lowerGeneration != generation))
+    {
+        CtrBottom_Blit(canvas, 0, W);
+        lowerRevision = CtrBottom_BufferRevision();
+        lowerGeneration = generation;
+    }
+    else if (kind != CTR_OVERLAY_PAUSE && lastKind == CTR_OVERLAY_PAUSE)
+        CtrBottom_Blit(sCanvas, 0, W);
     lastKind = kind;
     *pixels = canvas;
     *revision = generation;
@@ -7977,7 +8044,7 @@ void CtrBottom_Frame(void)
      * field opens it (OpenAsked), or it is dropped after four seconds. */
     if (sLeaveTo < SCR_COUNT && (mode == MODE_FIELD || mode >= MODE_BATTLE_INFO || ++sLeaveToWait > 240))
         sLeaveTo = SCR_COUNT;
-    pressed = ProcessTouch(mode, CtrInput_Get());
+    pressed = ProcessPauseOrNativeTouch(mode);
     ProcessKeys(mode);
     OpenAsked(mode);
     RunPlan();
