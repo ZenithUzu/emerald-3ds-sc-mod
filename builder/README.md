@@ -80,36 +80,25 @@ checked against the same CRCs and ABI. `tools/build_web_payload.py --synthetic
 DIR` writes a synthetic payload and "ROM" to exercise it without game data.
 
 Tests: `python -m unittest discover -s builder/tests` (synthetic data only).
-# CXI para Azahar y mod Una Pantalla
+## Azahar CXI and Single Screen mod
 
-El generador incluye el subcomando `azahar`. Usa los archivos de una
-compilación del port para generar un CXI con su propio Title ID.
-Para producir esos archivos, sigue la compilación desde fuente del proyecto
-con tu ROM del idioma correspondiente y compila con `EMBED_DATA=1`.
-El directorio indicado con `--port` debe contener `emerald3ds.elf`,
-`emerald3ds.smdh`, `romfs/` y las plantillas de este fork.
-
-Desde la raíz del repositorio, con Python y makerom disponibles:
+On Windows, use the [graphical builder](windows/README.md). The command-line
+builder also packages the compiled port. Build Emerald with embedded data
+and use the staged port directory containing the ELF, SMDH and RomFS.
 
 ```sh
-python tools/bootstrap.py --make --spanish-rom /ruta/esmeralda.gba
+python tools/bootstrap.py --make --spanish-rom /path/to/esmeralda.gba
 python builder/emerald3ds-builder.py azahar --port build/upstream/3ds_port --output dist/azahar --mod
 ```
 
-- Sin `--mod`, se genera el CXI con el mod desactivado.
-- Con `--mod`, también se genera `load/mods/<Title ID>/romfs`. Copia
-  `load` al directorio de usuario de Azahar para instalarlo en otro dispositivo.
-- `--install-mod` detecta Azahar o Azahar+ en el PC y copia el mod.
-  Si hay varias instalaciones o usas una portátil, pasa
-  `--azahar-dir RUTA` con la ruta que contiene su carpeta `config`.
-- `--makerom RUTA` permite indicar un ejecutable fuera de PATH.
-- `--title-key emerald-es` mantiene el mismo ID entre compilaciones de esa
-  variante. Si omites la clave, el ID se deriva del ELF de entrada.
-  Usa claves distintas si quieres conservar dos variantes lado a lado.
+- `--mod` exports the separate mod to `load/mods/<Title ID>/romfs`.
+- `--install-mod` detects Azahar or Azahar+ on the PC and installs the mod.
+  Use `--azahar-dir PATH` to select a specific emulator user directory.
+- `--makerom PATH` selects a makerom executable outside PATH.
+- `--title-key emerald-es` retains the same ID across rebuilds. Use a
+  different key for each game variant you want to keep side by side.
 
-Una Pantalla usa el idioma de cada compilación de Emerald. Admite inglés,
-español, francés, italiano, portugués brasileño, alemán y japonés. En Azahar,
-para usar el táctil sobre la imagen, selecciona el diseño personalizado,
-superpone ambas pantallas con el mismo rectángulo y pon la opacidad de la
-segunda capa al 0 %. En Android, coloca las coordenadas personalizadas en
-`[Layout]` en `config/config.ini` y juega en horizontal.
+The mod uses the language of the selected Emerald build. For touch input,
+use the emulator's custom landscape layout, set both screens to the same
+rectangle and set the second layer opacity to 0%. On Android, store custom
+coordinates under `[Layout]` in `config/config.ini`.

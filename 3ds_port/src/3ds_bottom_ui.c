@@ -7335,7 +7335,7 @@ static void DrawBattleOverlay(const ViewState *s)
         DrawStr(&sSmall, Ascii(selected == MAX_MON_MOVES
             ? CTR_TEXT("A / B BACK", "A / B VOLVER", "A / B RETOUR", "A / B INDIETRO", "A / B VOLTAR", "A / B ZURÜCK", "A / B もどる")
             : CTR_TEXT("MOVES", "MOVIMIENTOS", "CAPACITÉS", "MOSSE", "GOLPES", "ATTACKEN", "わざ")), 14, 197, TXT_DARK, TXT_LIGHT);
-        if (selected < MAX_MON_MOVES && s->moves4.moves[selected] != MOVE_NONE)
+        if (selected >= 0 && selected < MAX_MON_MOVES && s->moves4.moves[selected] != MOVE_NONE)
         {
             snprintf(pp, sizeof(pp), "PP %u/%u", s->moves4.currentPp[selected], s->moves4.maxPp[selected]);
             DrawStr(&sSmall, Ascii(pp), 14, 215, TXT_DARK, TXT_LIGHT);
@@ -7351,6 +7351,9 @@ static void DrawBattleOverlay(const ViewState *s)
         if (s->quickBall != ITEM_NONE)
             DrawStrRight(&sSmall, Ascii("X"), 114, 218, TXT_DARK, TXT_LIGHT);
     }
+    if (target)
+        TextIn(Ascii(CTR_TEXT("B BACK", "B VOLVER", "B RETOUR", "B INDIETRO", "B VOLTAR", "B ZURÜCK", "B もどる")),
+               10, 214, 106, 17, &sSmall, 'l', STYLE_INK, 4);
     for (int i = 0; i < 4; ++i)
     {
         const u8 *label = target ? (s->targets[i].live ? s->targets[i].nick : Ascii("---"))

@@ -25,12 +25,12 @@ and its separate LayeredFS mod.
 
 ### Windows graphical builder
 
-Download and open [`Emerald3DS-Azahar.exe`](https://github.com/ZenithUzu/emerald-3ds-sc-mod/releases/download/azahar-builder-windows-v1/Emerald3DS-Azahar.exe).
-Select the compiled `build/upstream/3ds_port`
-folder and an output folder, then click **Generar CXI**. Select
-**Exportar el mod separado** to copy the mod to another device, or
-**Instalar el mod en Azahar del PC** to install it locally. The executable
-packages an existing build and includes makerom. It runs without Python.
+Download and open [`Emerald3DS-Azahar.exe`](https://github.com/ZenithUzu/emerald-3ds-sc-mod/releases/download/azahar-builder-windows-v2/Emerald3DS-Azahar.exe).
+Choose the compiled `emerald3ds.elf`, then use **Save CXI as** to set the
+file name and location. Click **Build CXI**. To export or install the mod for
+an existing game built by this fork, select its `.cxi` and click **Set up mod**.
+The app shows the exact output and mod paths when finished. It includes
+makerom and runs without Python.
 
 The executable source and build script are in [builder/windows](builder/windows).
 
@@ -72,7 +72,7 @@ the generated Title ID and writes `Emerald3DS-<Title ID>.cxi` and
   to retain the generated Title ID. The builder preserves an existing mod
   configuration when the ID is reused.
 
-See the [builder documentation](builder/README.md#cxi-para-azahar-y-mod-una-pantalla)
+See the [builder documentation](builder/README.md#azahar-cxi-and-single-screen-mod)
 for the command options and Android configuration.
 
 ## Get the latest version — directly in your browser

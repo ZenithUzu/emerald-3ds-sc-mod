@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -14,9 +14,9 @@ namespace Emerald3DS {
         readonly TextBox output = new TextBox();
         readonly TextBox key = new TextBox();
         readonly TextBox emulator = new TextBox();
-        readonly CheckBox export = new CheckBox { Text = "Exportar el mod separado", Checked = true, AutoSize = true };
-        readonly CheckBox install = new CheckBox { Text = "Instalar el mod en Azahar del PC", AutoSize = true };
-        readonly Button build = new Button { Text = "Generar CXI", AutoSize = true };
+        readonly CheckBox export = new CheckBox { Text = "Export LayeredFS mod", Checked = true, AutoSize = true };
+        readonly CheckBox install = new CheckBox { Text = "Install mod in Azahar on this PC", AutoSize = true };
+        readonly Button build = new Button { Text = "Build CXI", AutoSize = true };
         readonly Label status = new Label { AutoSize = true };
 
         [STAThread]
@@ -27,9 +27,9 @@ namespace Emerald3DS {
         }
 
         BuilderWindow() {
-            Text = "Emerald 3DS · Generador para Azahar";
+            Text = "Emerald 3DS · Azahar Builder";
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(675, 320);
+            ClientSize = new Size(780, 405);
             MinimumSize = new Size(610, 350);
             Font = SystemFonts.MessageBoxFont;
             var panel = new TableLayoutPanel {
@@ -39,17 +39,27 @@ namespace Emerald3DS {
             panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             Controls.Add(panel);
-            Line(panel, "Compilación de Emerald", port, true);
-            Line(panel, "Carpeta de salida", output, true);
-            Line(panel, "Clave fija del ID (opcional)", key, false);
+            Wide(panel, new Label { Text = "Choose emerald3ds.elf to build a game, or an existing Emerald CXI to add the mod.", AutoSize = true });
+            Line(panel, "Input file", port, true);
+            Line(panel, "Save CXI as", output, true);
+            Line(panel, "Stable ID key (optional)", key, false);
             Wide(panel, export);
             Wide(panel, install);
-            Line(panel, "Carpeta de Azahar", emulator, true);
+            Line(panel, "Azahar user folder", emulator, true);
             Wide(panel, build);
             Wide(panel, status);
+            var openOutput = new Button { Text = "Open output folder", AutoSize = true, Enabled = false };
+            Wide(panel, openOutput);
+            string lastFolder = null;
+            openOutput.Click += (sender, args) => Process.Start("explorer.exe", "\"" + lastFolder + "\"");
+            port.TextChanged += (sender, args) => {
+                bool existing = IsCxi(port.Text.Trim());
+                build.Text = existing ? "Set up mod" : "Build CXI";
+                output.Enabled = key.Enabled = !existing;
+            };
             var staged = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "build", "upstream", "3ds_port");
-            if (File.Exists(Path.Combine(staged, "emerald3ds.elf"))) port.Text = staged;
-            output.Text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Emerald3DS-Azahar");
+            if (File.Exists(Path.Combine(staged, "emerald3ds.elf"))) port.Text = Path.Combine(staged, "emerald3ds.elf");
+            output.Text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Emerald3DS.cxi");
             emulator.Text = FindEmulator();
             install.CheckedChanged += (sender, args) => emulator.Enabled = install.Checked;
             emulator.Enabled = false;
@@ -58,16 +68,21 @@ namespace Emerald3DS {
                 var dest = output.Text.Trim();
                 var titleKey = key.Text.Trim();
                 var root = install.Checked ? emulator.Text.Trim() : null;
-                var withMod = export.Checked || install.Checked;
+                bool exportMod = export.Checked;
+                bool existing = IsCxi(input);
+                openOutput.Enabled = false;
                 panel.Enabled = false;
-                status.Text = "Generando el CXI…";
+                status.Text = "Working…";
                 try {
-                    var id = await Task.Run(() => Generate(input, dest, titleKey, withMod, root));
-                    status.Text = "Listo · Title ID " + id;
-                    MessageBox.Show(this, "Archivo creado en " + Path.GetFullPath(dest) +
-                        "\nTitle ID " + id, Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    var result = await Task.Run(() => existing
+                        ? SetUpMod(input, exportMod, root)
+                        : Generate(input, dest, titleKey, exportMod, root));
+                    lastFolder = Path.GetDirectoryName(result.Cxi);
+                    openOutput.Enabled = true;
+                    status.Text = "Done · Title ID " + result.Id;
+                    MessageBox.Show(this, result.Summary(), Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
                 } catch (Exception error) {
-                    status.Text = "No se completó la generación.";
+                    status.Text = "The operation could not be completed.";
                     MessageBox.Show(this, error.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
                 } finally {
                     panel.Enabled = true;
@@ -82,19 +97,38 @@ namespace Emerald3DS {
             panel.SetColumnSpan(control, 3);
         }
 
-        static void Line(TableLayoutPanel panel, string label, TextBox box, bool browse) {
+        void Line(TableLayoutPanel panel, string label, TextBox box, bool browse) {
             int row = panel.RowCount++;
             panel.Controls.Add(new Label { Text = label, AutoSize = true, Anchor = AnchorStyles.Left }, 0, row);
             box.Dock = DockStyle.Fill;
             panel.Controls.Add(box, 1, row);
             if (!browse) return;
-            var button = new Button { Text = "Examinar…", AutoSize = true };
+            var button = new Button { Text = "Browse…", AutoSize = true };
             panel.Controls.Add(button, 2, row);
             button.Click += (sender, args) => {
                 if (!box.Enabled) return;
+                if (box == port) {
+                    using (var dialog = new OpenFileDialog {
+                        Title = "Select an Emerald build or game", Filter = "Emerald inputs (*.elf;*.cxi)|*.elf;*.cxi",
+                        CheckFileExists = true, AutoUpgradeEnabled = true
+                    }) {
+                        if (dialog.ShowDialog(this) == DialogResult.OK) box.Text = dialog.FileName;
+                    }
+                    return;
+                }
+                if (box == output) {
+                    using (var dialog = new SaveFileDialog {
+                        Title = "Choose the CXI file name and location", Filter = "Nintendo 3DS CXI (*.cxi)|*.cxi",
+                        DefaultExt = "cxi", AddExtension = true, OverwritePrompt = false
+                    }) {
+                        dialog.FileName = Path.GetFileName(box.Text);
+                        if (dialog.ShowDialog(this) == DialogResult.OK) box.Text = dialog.FileName;
+                    }
+                    return;
+                }
                 using (var dialog = new FolderBrowserDialog()) {
                     if (Directory.Exists(box.Text)) dialog.SelectedPath = box.Text;
-                    if (dialog.ShowDialog() == DialogResult.OK) box.Text = dialog.SelectedPath;
+                    if (dialog.ShowDialog(this) == DialogResult.OK) box.Text = dialog.SelectedPath;
                 }
             };
         }
@@ -110,7 +144,7 @@ namespace Emerald3DS {
 
         static Stream Resource(string name) {
             var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(name);
-            if (stream == null) throw new InvalidOperationException("Falta el recurso " + name);
+            if (stream == null) throw new InvalidOperationException("Missing resource: " + name);
             return stream;
         }
 
@@ -122,35 +156,87 @@ namespace Emerald3DS {
                 CopyTree(folder, Path.Combine(to, Path.GetFileName(folder)));
         }
 
-        static void WriteMod(string root, string id) {
+        static string WriteMod(string root, string id) {
             var folder = Path.Combine(root, "load", "mods", id, "romfs", "mods");
             Directory.CreateDirectory(folder);
             var file = Path.Combine(folder, "una-pantalla.ini");
-            if (File.Exists(file)) return;
+            if (File.Exists(file)) return folder;
             using (var src = Resource("mod.ini"))
             using (var dest = new FileStream(file, FileMode.CreateNew))
                 src.CopyTo(dest);
+            return folder;
         }
 
-        internal static string Generate(string port, string output, string key, bool export, string emulator) {
-            if (String.IsNullOrWhiteSpace(port) || String.IsNullOrWhiteSpace(output))
-                throw new ArgumentException("Selecciona la carpeta de compilación y la carpeta de salida.");
+        static bool IsCxi(string path) {
+            return path.EndsWith(".cxi", StringComparison.OrdinalIgnoreCase);
+        }
+
+        internal sealed class Result {
+            public string Cxi, Id, Export, Installed;
+
+            public string Summary() {
+                var text = "CXI: " + Cxi + "\nTitle ID: " + Id;
+                if (Export != null) text += "\n\nExported mod: " + Export;
+                if (Installed != null) text += "\n\nInstalled mod: " + Installed;
+                return text;
+            }
+        }
+
+        static void ValidateEmulator(string emulator) {
             if (emulator != null && (emulator.Length == 0 || !Directory.Exists(Path.Combine(emulator, "config"))))
-                throw new ArgumentException("Selecciona la carpeta de usuario de Azahar que contiene config.");
-            port = Path.GetFullPath(port);
-            output = Path.GetFullPath(output);
-            var elf = Path.Combine(port, "emerald3ds.elf");
+                throw new ArgumentException("Choose the Azahar user folder that contains config.");
+        }
+
+        static ulong ReadId(string path, bool checkProduct) {
+            using (var reader = new BinaryReader(File.OpenRead(path))) {
+                reader.BaseStream.Position = 0x100;
+                if (Encoding.ASCII.GetString(reader.ReadBytes(4)) != "NCCH")
+                    throw new IOException("The file is not a valid CXI.");
+                reader.BaseStream.Position = 0x118;
+                ulong id = reader.ReadUInt64();
+                reader.BaseStream.Position = 0x150;
+                if (checkProduct && Encoding.ASCII.GetString(reader.ReadBytes(16)).TrimEnd('\0') != "CTR-H-EM3S")
+                    throw new IOException("Choose an Emerald CXI generated by this fork.");
+                return id;
+            }
+        }
+
+        static Result PlaceMod(string cxi, string id, bool export, string emulator) {
+            var result = new Result { Cxi = cxi, Id = id };
+            if (export) result.Export = WriteMod(Path.GetDirectoryName(cxi), id);
+            if (emulator != null) result.Installed = WriteMod(emulator, id);
+            return result;
+        }
+
+        internal static Result SetUpMod(string cxi, bool export, string emulator) {
+            ValidateEmulator(emulator);
+            if (!export && emulator == null) throw new ArgumentException("Select at least one mod destination.");
+            cxi = Path.GetFullPath(cxi);
+            return PlaceMod(cxi, ReadId(cxi, true).ToString("X16"), export, emulator);
+        }
+
+        internal static Result Generate(string input, string outputFile, string key, bool export, string emulator) {
+            if (String.IsNullOrWhiteSpace(input) || String.IsNullOrWhiteSpace(outputFile))
+                throw new ArgumentException("Choose the input file and CXI output path.");
+            ValidateEmulator(emulator);
+            var elf = Path.GetFullPath(input);
+            if (!elf.EndsWith(".elf", StringComparison.OrdinalIgnoreCase) || !IsCxi(outputFile))
+                throw new ArgumentException("Choose an ELF input and a CXI output file.");
+            var port = Path.GetDirectoryName(elf);
+            var final = Path.GetFullPath(outputFile);
+            var output = Path.GetDirectoryName(final);
+            if (File.Exists(final)) throw new IOException("That CXI already exists. Choose another file name.");
             var icon = Path.Combine(port, "emerald3ds.smdh");
             var romfs = Path.Combine(port, "romfs");
             if (!File.Exists(elf) || !File.Exists(icon) ||
                 !File.Exists(Path.Combine(romfs, "data.embedded")) ||
                 !File.Exists(Path.Combine(romfs, "engine", "abi.bin")))
-                throw new ArgumentException("Selecciona build/upstream/3ds_port de una compilación con datos incrustados.");
+                throw new ArgumentException("Choose emerald3ds.elf from a build with embedded data, alongside emerald3ds.smdh and romfs.");
             if (File.Exists(Path.Combine(romfs, "mods", "una-pantalla.ini")))
-                throw new ArgumentException("La RomFS de compilación ya contiene el archivo del mod. Usa la RomFS original.");
+                throw new ArgumentException("Select a build whose RomFS does not already contain the mod.");
             if (output.TrimEnd('\\').StartsWith(romfs.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase) ||
                 String.Equals(output, romfs, StringComparison.OrdinalIgnoreCase))
-                throw new ArgumentException("Selecciona una salida fuera de romfs.");
+                throw new ArgumentException("Choose an output path outside the input RomFS.");
             int unique;
             using (var sha = SHA256.Create()) {
                 var prefix = Encoding.UTF8.GetBytes("emerald3ds-azahar\0");
@@ -198,22 +284,12 @@ namespace Emerald3DS {
                     var errors = process.StandardError.ReadToEnd();
                     process.WaitForExit();
                     if (process.ExitCode != 0)
-                        throw new IOException("makerom no pudo generar el CXI. " + errors);
+                        throw new IOException("makerom could not create the CXI. " + errors);
                 }
-                using (var reader = new BinaryReader(File.OpenRead(tempCxi))) {
-                    reader.BaseStream.Position = 0x100;
-                    if (Encoding.ASCII.GetString(reader.ReadBytes(4)) != "NCCH")
-                        throw new IOException("El archivo generado no es un CXI válido.");
-                    reader.BaseStream.Position = 0x118;
-                    if (reader.ReadUInt64() != programId)
-                        throw new IOException("El CXI no contiene el Title ID esperado.");
-                }
-                var final = Path.Combine(output, "Emerald3DS-" + id + ".cxi");
-                if (File.Exists(final)) File.Replace(tempCxi, final, null);
-                else File.Move(tempCxi, final);
-                if (export) WriteMod(output, id);
-                if (emulator != null) WriteMod(emulator, id);
-                return id;
+                if (ReadId(tempCxi, true) != programId)
+                    throw new IOException("The generated CXI has an unexpected Title ID.");
+                File.Move(tempCxi, final);
+                return PlaceMod(final, id, export, emulator);
             } finally {
                 Directory.Delete(temp, true);
             }
