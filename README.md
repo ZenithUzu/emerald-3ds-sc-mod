@@ -25,7 +25,7 @@ and its separate LayeredFS mod.
 
 ### Windows graphical builder
 
-Open `Emerald3DS-Azahar.exe` after building the installer profile below.
+Download and open [`Emerald3DS-Azahar-v3.exe`](https://github.com/ZenithUzu/emerald-3ds-sc-mod/releases/download/azahar-builder-windows-v3/Emerald3DS-Azahar-v3.exe).
 Extract your Emerald 3DS download from the official builder. Drop the
 extracted folder onto **Game folder or file**, or browse to its
 `Emerald3DS.3dsx`. Choose **Save CXI as** and click **Build CXI**.
