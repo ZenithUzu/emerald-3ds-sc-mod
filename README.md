@@ -23,7 +23,17 @@ touch controls to the Emerald 3DS port. The upstream web builder provides
 the original port. Use this fork's source tools to generate a compatible CXI
 and its separate LayeredFS mod.
 
-### Build the game and export the mod
+### Windows graphical builder
+
+Open `Emerald3DS-Azahar.exe`, select the compiled `build/upstream/3ds_port`
+folder and an output folder, then click **Generar CXI**. Select
+**Exportar el mod separado** to copy the mod to another device, or
+**Instalar el mod en Azahar del PC** to install it locally. The executable
+packages an existing build and includes makerom. It runs without Python.
+
+The executable source and build script are in [builder/windows](builder/windows).
+
+### Build the game from source
 
 Set up Python, devkitPro and the host compiler as described in
 [Development](docs/DEVELOPMENT.md), and make `makerom` available on PATH.
@@ -32,6 +42,12 @@ supported Pokémon Esmeralda ROM:
 
 ```sh
 python tools/bootstrap.py --make --spanish-rom /path/to/esmeralda.gba
+```
+
+Use the Windows graphical builder above, or run the packaging command on the
+command line:
+
+```sh
 python builder/emerald3ds-builder.py azahar --port build/upstream/3ds_port --output dist/azahar --mod
 ```
 
