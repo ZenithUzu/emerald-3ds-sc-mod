@@ -8394,7 +8394,7 @@ bool CtrVideo_BottomWhole(void) { return sBottomInUse && BottomWhole(sCentredScr
 
 static void BottomTransfer(void)
 {
-    u16 *fb = (u16 *)gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, NULL, NULL);
+    u16 *fb = CtrBottom_Framebuffer();
     u16 *in;
     const u32 flags = GX_TRANSFER_FLIP_VERT(0) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0)
                     | GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGB565) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB565)
@@ -12344,7 +12344,7 @@ static bool UploadTopMenu(bool gpuWroteBottom, unsigned kind, const u16 *overlay
 
     if (kind == CTR_OVERLAY_NONE)
     {
-        fb = (const u16 *)gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, NULL, NULL);
+        fb = CtrBottom_Framebuffer();
         revision = CtrBottom_BufferRevision();
         if (!fb || gfxGetScreenFormat(GFX_BOTTOM) != GSP_RGB565_OES)
             return false;
@@ -12430,6 +12430,48 @@ static void DrawTopMenu(bool stereo, unsigned kind)
     BlendForget();
 }
 
+static u16 *sTouchMirror;
+static unsigned sTouchMirrorWidth;
+static bool sTouchMirrorPending;
+
+/* Transfer the composed left eye before Citro3D presents it. On the next
+ * frame the queue has completed and the linear image can be resampled. */
+static void QueueTouchMirror(void)
+{
+    unsigned width = sTop->frameBuf.height;
+    if (!CtrSettings_SingleScreen()) return;
+    if (!sTouchMirror)
+    {
+        sTouchMirror = linearAlloc(width * CTR_GAME_HEIGHT * sizeof(*sTouchMirror));
+        if (!sTouchMirror) return;
+        sTouchMirrorWidth = width;
+    }
+    if (width != sTouchMirrorWidth) return;
+    if (!CtrBottom_EnableMirror()) return;
+    u32 flags = GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8)
+              | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB565);
+    C3D_SyncDisplayTransfer((u32 *)sTop->frameBuf.colorBuf, GX_BUFFER_DIM(CTR_GAME_HEIGHT, width),
+                            (u32 *)sTouchMirror, GX_BUFFER_DIM(CTR_GAME_HEIGHT, width), flags);
+    sTouchMirrorPending = true;
+}
+
+static void PresentTouchMirror(void)
+{
+    if (!sTouchMirrorPending) return;
+    sTouchMirrorPending = false;
+    if (!CtrSettings_SingleScreen() || gfxGetScreenFormat(GFX_BOTTOM) != GSP_RGB565_OES) return;
+    u16 *fb = (u16 *)gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, NULL, NULL);
+    if (!fb) return;
+    GSPGPU_InvalidateDataCache(sTouchMirror, sTouchMirrorWidth * CTR_GAME_HEIGHT * sizeof(*sTouchMirror));
+    for (unsigned x = 0; x < CTR_BOTTOM_WIDTH; ++x)
+    {
+        unsigned from = (x * sTouchMirrorWidth + sTouchMirrorWidth / 2) / CTR_BOTTOM_WIDTH;
+        memcpy(fb + x * CTR_GAME_HEIGHT, sTouchMirror + from * CTR_GAME_HEIGHT,
+               CTR_GAME_HEIGHT * sizeof(*fb));
+    }
+    GSPGPU_FlushDataCache(fb, CTR_BOTTOM_WIDTH * CTR_GAME_HEIGHT * sizeof(*fb));
+}
+
 void CtrVideo_Present(void)
 {
     /* The frame's entry tick: its preparation, before FrameBegin. */
@@ -12475,10 +12517,12 @@ void CtrVideo_Present(void)
         /* The Pokédex gone with the top still held: its frame back, once. */
         if ((menuOnTop || (sHeldTop.kept && sHoldTop)) && C3D_FrameBegin(C3D_FRAME_SYNCDRAW))
         {
+            PresentTouchMirror();
             if (menuOnTop && UploadTopMenu(gpuWroteBottom, overlayKind, overlay, overlayRevision))
                 DrawTopMenu(sTopRight != NULL, overlayKind);
             else if (sHeldTop.kept && sHoldTop)
                 HeldTopPutBack();
+            QueueTouchMirror();
             C3D_FrameEnd(0);
         }
         else
@@ -12573,6 +12617,7 @@ void CtrVideo_Present(void)
     uint64_t waitStart = svcGetSystemTick();
     CtrVoxel_NoteFrameWait(waitStart);
     if (!C3D_FrameBegin(C3D_FRAME_SYNCDRAW)) return;
+    PresentTouchMirror();
     bool topMenuReady = menuOnTop && UploadTopMenu(gpuWroteBottom, overlayKind, overlay, overlayRevision);
     /* A late clear wiped the scene surface's kept scenery, if it was that. */
     if (ClearsRun()) sSceneCached = sSceneEmpty = false;
@@ -13089,6 +13134,7 @@ void CtrVideo_Present(void)
         DrawTopMenu(stereo, overlayKind);
     /* Queued in the frame, behind the drawing into sBottom (BottomTransfer). */
     if (bottom) BottomTransfer();
+    QueueTouchMirror();
     PORT_PROF_END(draw, PORT_PROF_DRAW);
     PORT_PROF_BEGIN(frameEnd);
     float gpuStartMs;
@@ -13259,6 +13305,10 @@ void CtrVideo_Shutdown(void)
     CornerArtRelease();
     if (sAtlas.data) C3D_TexDelete(&sAtlas);
     if (sC3d) C3D_Fini();
+    if (sTouchMirror) linearFree(sTouchMirror);
+    sTouchMirror = NULL;
+    sTouchMirrorPending = false;
+    CtrBottom_ReleaseMirror();
     sLogical = sTop = sTopRight = NULL;
     sC2d = sC3d = false;
     memset(&sSurface, 0, sizeof(sSurface));

@@ -25,7 +25,7 @@ and its separate LayeredFS mod.
 
 ### Windows graphical builder
 
-Download and open [`Emerald3DS-Azahar-v3.exe`](https://github.com/ZenithUzu/emerald-3ds-sc-mod/releases/download/azahar-builder-windows-v3/Emerald3DS-Azahar-v3.exe).
+Download and open [`Emerald3DS-Azahar-Touch.exe`](https://github.com/ZenithUzu/emerald-3ds-sc-mod/releases/download/azahar-builder-touch-v1/Emerald3DS-Azahar-Touch.exe).
 Extract your Emerald 3DS download from the official builder. Drop the
 extracted folder onto **Game folder or file**, or browse to its
 `Emerald3DS.3dsx`. Choose **Save CXI as** and click **Build CXI**.
@@ -67,10 +67,11 @@ the generated Title ID and writes `Emerald3DS-<Title ID>.cxi` and
 - **PC.** Add `--install-mod` to the builder command to copy the mod into the
   detected emulator directory. Use `--azahar-dir PATH` for a portable
   installation or to choose between Azahar and Azahar+.
-- **Touch controls.** Select the emulator's custom layout in landscape,
-  give both screens the same rectangle and set the second layer opacity to
-  0%. Azahar's built-in top-only layout disables the Nintendo 3DS touch
-  surface. START also opens the pause menu.
+- **Touch controls.** In builds with the lower-screen mirror, choose
+  **Single Screen** and **Swap Screens** to show the lower screen. In
+  **Original** or other layouts that show both screens, interact with the
+  lower screen. The upper screen keeps its stereoscopic output and START
+  also opens the pause menu.
 - **Updates.** Use the same `--title-key` on later builds of the same language
   to retain the generated Title ID. The builder preserves an existing mod
   configuration when the ID is reused.

@@ -98,7 +98,6 @@ python builder/emerald3ds-builder.py azahar --port build/upstream/3ds_port --out
 - `--title-key emerald-es` retains the same ID across rebuilds. Use a
   different key for each game variant you want to keep side by side.
 
-The mod uses the language of the selected Emerald build. For touch input,
-use the emulator's custom landscape layout, set both screens to the same
-rectangle and set the second layer opacity to 0%. On Android, store custom
-coordinates under `[Layout]` in `config/config.ini`.
+The mod uses the language of the selected Emerald build. Builds with
+lower-screen mirroring accept touch input wherever Azahar displays the
+lower screen. In Single Screen mode, select Swap Screens to display it.

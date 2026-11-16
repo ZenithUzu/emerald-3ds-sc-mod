@@ -19,6 +19,9 @@
 
 /* Native side (libctru): copy columns [x0, x1) of the canvas to the screen. */
 void CtrBottom_Blit(const uint16_t *canvas, int x0, int x1);
+uint16_t *CtrBottom_Framebuffer(void);
+bool CtrBottom_EnableMirror(void);
+void CtrBottom_ReleaseMirror(void);
 /* Same, restricted to rows [y0, y1) of those columns. */
 void CtrBottom_BlitRect(const uint16_t *canvas, int x0, int y0, int x1, int y1);
 /* What the last Blit or BlitRect spent copying to the screen and flushing the
