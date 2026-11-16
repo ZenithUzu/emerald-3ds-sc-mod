@@ -10,34 +10,11 @@
 #include <3ds.h>
 #include <string.h>
 #include "3ds_bottom.h"
-#include "3ds_platform.h"
 
-static u16 *sPanelBuffer;
-
-bool CtrBottom_EnableMirror(void)
-{
-    if (!sPanelBuffer)
-    {
-        const size_t bytes = CTR_BOTTOM_WIDTH * CTR_BOTTOM_HEIGHT * sizeof(u16);
-        sPanelBuffer = linearAlloc(bytes);
-        if (!sPanelBuffer) return false;
-        memset(sPanelBuffer, 0, bytes);
-        GSPGPU_FlushDataCache(sPanelBuffer, bytes);
-    }
-    return true;
-}
-
-void CtrBottom_ReleaseMirror(void)
-{
-    if (sPanelBuffer) linearFree(sPanelBuffer);
-    sPanelBuffer = NULL;
-}
-
-u16 *CtrBottom_Framebuffer(void)
+static u16 *Framebuffer(void)
 {
     if (gfxGetScreenFormat(GFX_BOTTOM) != GSP_RGB565_OES)
         return NULL;
-    if (sPanelBuffer && CtrSettings_SingleScreen()) return sPanelBuffer;
     return (u16 *)gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, NULL, NULL);
 }
 
@@ -60,7 +37,7 @@ void CtrBottom_LastBlitTicks(uint64_t *copy, uint64_t *flush)
 
 void CtrBottom_Blit(const uint16_t *canvas, int x0, int x1)
 {
-    u16 *fb = CtrBottom_Framebuffer();
+    u16 *fb = Framebuffer();
     u64 t0, t1;
 
     sCopyTicks = sFlushTicks = 0;
@@ -77,7 +54,7 @@ void CtrBottom_Blit(const uint16_t *canvas, int x0, int x1)
 
 void CtrBottom_BlitRect(const uint16_t *canvas, int x0, int y0, int x1, int y1)
 {
-    u16 *fb = CtrBottom_Framebuffer();
+    u16 *fb = Framebuffer();
     /* A column runs bottom-to-top, so rows [y0, y1) are one contiguous run. */
     int first = CTR_BOTTOM_HEIGHT - y1, count = y1 - y0;
     u64 t0, t1;
@@ -108,7 +85,7 @@ void CtrBottom_BlitRect(const uint16_t *canvas, int x0, int y0, int x1, int y1)
  */
 void CtrBottom_BlitDim(const uint16_t *canvas, int level)
 {
-    u16 *fb = CtrBottom_Framebuffer();
+    u16 *fb = Framebuffer();
     size_t pixels = (size_t)CTR_BOTTOM_WIDTH * CTR_BOTTOM_HEIGHT;
 
     if (!fb) return;

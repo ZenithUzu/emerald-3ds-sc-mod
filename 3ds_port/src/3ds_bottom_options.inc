@@ -56,7 +56,6 @@ static const OptRowDef sRowsSystem[] = {
 };
 static const OptRowDef sRowsMod[] = {
     EXTRA_ROW("mod_single_screen"),
-    EXTRA_ROW("mod_touch_top"),
     EXTRA_ROW("mod_pause_ui"),
     EXTRA_ROW("mod_battle_ui"),
     EXTRA_ROW("mod_pause_dim"),

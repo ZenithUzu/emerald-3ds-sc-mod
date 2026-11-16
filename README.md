@@ -19,13 +19,13 @@
 ## Single Screen mod for Azahar
 
 This fork adds an optional single-screen pause menu, battle interface and
-touch controls to the Emerald 3DS port. The upstream web builder provides
+controller navigation on the upper screen to the Emerald 3DS port. The upstream web builder provides
 the original port. Use this fork's source tools to generate a compatible CXI
 and its separate LayeredFS mod.
 
 ### Windows graphical builder
 
-Download and open [`Emerald3DS-Azahar-Touch.exe`](https://github.com/ZenithUzu/emerald-3ds-sc-mod/releases/download/azahar-builder-touch-v1/Emerald3DS-Azahar-Touch.exe).
+Download and open [`Emerald3DS-Azahar-Controller.exe`](https://github.com/ZenithUzu/emerald-3ds-sc-mod/releases/download/azahar-builder-controller-v1/Emerald3DS-Azahar-Controller.exe).
 Extract your Emerald 3DS download from the official builder. Drop the
 extracted folder onto **Game folder or file**, or browse to its
 `Emerald3DS.3dsx`. Choose **Save CXI as** and click **Build CXI**.
@@ -67,11 +67,11 @@ the generated Title ID and writes `Emerald3DS-<Title ID>.cxi` and
 - **PC.** Add `--install-mod` to the builder command to copy the mod into the
   detected emulator directory. Use `--azahar-dir PATH` for a portable
   installation or to choose between Azahar and Azahar+.
-- **Touch controls.** In builds with the lower-screen mirror, choose
-  **Single Screen** and **Swap Screens** to show the lower screen. In
-  **Original** or other layouts that show both screens, interact with the
-  lower screen. The upper screen keeps its stereoscopic output and START
-  also opens the pause menu.
+- **Controls.** Choose **Single Screen** with the upper screen visible, or
+  keep the **Original** layout. Press START or X to open the pause menu,
+  use the D-pad to navigate, A to select, and B to go back. The upper
+  screen displays the menus and keeps its stereoscopic output. In Original
+  layout the lower screen also retains its native touch controls.
 - **Updates.** Use the same `--title-key` on later builds of the same language
   to retain the generated Title ID. The builder preserves an existing mod
   configuration when the ID is reused.

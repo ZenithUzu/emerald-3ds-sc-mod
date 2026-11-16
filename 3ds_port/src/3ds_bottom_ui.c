@@ -7053,11 +7053,6 @@ static const s16 sPauseNodes[SCR_COUNT][2] = {
     {105, 151}, {80, 106}, {107, 62}, {270, 159},
 };
 
-static bool8 TouchOnTop(void)
-{
-    return CtrSettings_SingleScreen() && CtrSettings_GetInt("mod_touch_top", 1) != 0;
-}
-
 static unsigned ScreenOverlayKind(void)
 {
     if (!sRes.ready || !CtrSettings_SingleScreen() || CtrBottom_PeekTop())
@@ -7066,137 +7061,11 @@ static unsigned ScreenOverlayKind(void)
     {
         if (sFocus < SCR_COUNT && CtrExtras_Get("mod_pause_ui") < 2)
             return CTR_OVERLAY_PAUSE;
-        if (sFocus == FOCUS_NONE && TouchOnTop() && FieldIdle())
-            return CTR_OVERLAY_SHORTCUT;
     }
     if (gMain.inBattle && !sShown.safari && CtrExtras_Get("mod_battle_ui") == 0
      && sShown.mode >= MODE_BATTLE_ACTION && sShown.mode <= MODE_BATTLE_TARGET)
         return CTR_OVERLAY_BATTLE;
     return CTR_OVERLAY_NONE;
-}
-
-/* Azahar overlaps its invisible lower screen with the 400x240 upper one.
- * HID reports the same point in the physical lower screen's 320x240 space. */
-static int TouchCanvasX(int x)
-{
-    return ((x * 400 + 200) / W) - (400 - W) / 2;
-}
-
-static u8 OverlayTouchHit(unsigned kind, int x, int y)
-{
-    if (kind == CTR_OVERLAY_BATTLE)
-    {
-        for (int i = 0; i < 4; ++i)
-        {
-            int bx = 124 + (i & 1) * 97, by = 190 + (i >> 1) * 24;
-            if (x < bx || x >= bx + 93 || y < by || y >= by + 21)
-                continue;
-            if (sShown.mode == MODE_BATTLE_ACTION)
-                return HIT_ACTION + i;
-            if (sShown.mode == MODE_BATTLE_MOVE)
-                return sShown.moves4.moves[i] != MOVE_NONE ? HIT_MOVE + i : HIT_NONE;
-            return sShown.targets[i].live ? HIT_TARGET + i : HIT_NONE;
-        }
-        if (x >= 6 && x < 120 && y >= 190 && y < 236)
-        {
-            if (sShown.mode != MODE_BATTLE_ACTION)
-                return HIT_CANCEL;
-            if (sShown.quickBall != ITEM_NONE)
-                return HIT_QUICK_BALL;
-        }
-        return HIT_NONE;
-    }
-    if (kind == CTR_OVERLAY_SHORTCUT)
-        return HIT_OK;
-    x = TouchCanvasX(x);
-    if (x >= 253 && x < 313 && y >= 207 && y < 234)
-        return HIT_CANCEL;
-    for (u8 i = 0; i < SCR_COUNT; ++i)
-    {
-        int dx = abs(x - sPauseNodes[i][0]), dy = abs(y - sPauseNodes[i][1]);
-        bool8 radial = CtrExtras_Get("mod_pause_ui") == 1;
-        bool8 inside = radial ? dx * dx + dy * dy <= 19 * 19 : dy <= 23 && dx <= 23 - dy / 2;
-
-        if (inside && ColumnItemAvailable(i))
-            return HIT_COLUMN + i;
-    }
-    return HIT_NONE;
-}
-
-static u8 ProcessScreenTouch(u8 mode)
-{
-    static unsigned touchKind;
-    static u8 touchMode, hit;
-    static u16 lastX, lastY;
-    static bool8 back;
-    const CtrInput *in = CtrInput_Get();
-    unsigned kind = mode == sShown.mode ? ScreenOverlayKind() : CTR_OVERLAY_NONE;
-    bool8 panel = CtrBottom_ShowOnTop() || CtrVideo_BottomInUse();
-
-    if (!TouchOnTop())
-    {
-        touchKind = CTR_OVERLAY_NONE;
-        back = FALSE;
-        return CtrSettings_SingleScreen() ? HIT_NONE : ProcessTouch(mode, in);
-    }
-    if (in->touchActive)
-    {
-        lastX = in->touchX;
-        lastY = in->touchY;
-    }
-    if (in->touchDown)
-    {
-        touchKind = kind;
-        touchMode = mode;
-        hit = kind ? OverlayTouchHit(kind, in->touchX, in->touchY) : HIT_NONE;
-        back = !kind && panel && TouchCanvasX(lastX) < -6 && lastY >= 6 && lastY < 34;
-    }
-    if (back)
-    {
-        if (in->touchUp)
-        {
-            if (touchMode == mode && !kind && TouchCanvasX(lastX) < -6 && lastY >= 6 && lastY < 34)
-            {
-                if (mode == MODE_FIELD && !sMapFly)
-                    LeaveFocus();
-                else if (mode == MODE_FIELD)
-                    CancelFlyMap();
-                else
-                    PressOnce(B_BUTTON);
-            }
-            back = FALSE;
-        }
-        return HIT_NONE;
-    }
-    if (kind || touchKind)
-    {
-        if (in->touchUp)
-        {
-            if (touchKind == kind && touchMode == mode && hit != HIT_NONE
-             && OverlayTouchHit(kind, lastX, lastY) == hit)
-            {
-                if (kind == CTR_OVERLAY_SHORTCUT)
-                    MoveFocus(&sFocus, SCR_MAP);
-                else if (kind == CTR_OVERLAY_BATTLE)
-                    Activate(hit, mode);
-                else if (hit == HIT_CANCEL)
-                    LeaveFocus();
-                else
-                    ChooseColumnItem(mode, hit - HIT_COLUMN);
-            }
-            touchKind = CTR_OVERLAY_NONE;
-        }
-        return HIT_NONE;
-    }
-    if (!panel)
-        return HIT_NONE;
-
-    CtrInput mapped = *in;
-    int x = TouchCanvasX(in->touchX);
-    if (in->touchDown && (x < 0 || x >= W))
-        return HIT_NONE;
-    mapped.touchX = x < 0 ? 0 : x >= W ? W - 1 : x;
-    return ProcessTouch(mode, &mapped);
 }
 
 static u8 PauseDirection(u8 from, u16 down)
@@ -7373,8 +7242,6 @@ unsigned CtrBottom_TopOverlay(const uint16_t **pixels, uint32_t *revision)
     int style = CtrExtras_Get("mod_pause_ui");
     unsigned kind = ScreenOverlayKind();
 
-    if (kind == CTR_OVERLAY_SHORTCUT)
-        kind = CTR_OVERLAY_NONE;
     if (kind != CTR_OVERLAY_NONE
      && (kind != lastKind || style != lastStyle || sFocus != lastFocus
       || memcmp(&lastView, &sShown, sizeof(sShown)) != 0))
@@ -8110,7 +7977,7 @@ void CtrBottom_Frame(void)
      * field opens it (OpenAsked), or it is dropped after four seconds. */
     if (sLeaveTo < SCR_COUNT && (mode == MODE_FIELD || mode >= MODE_BATTLE_INFO || ++sLeaveToWait > 240))
         sLeaveTo = SCR_COUNT;
-    pressed = ProcessScreenTouch(mode);
+    pressed = ProcessTouch(mode, CtrInput_Get());
     ProcessKeys(mode);
     OpenAsked(mode);
     RunPlan();

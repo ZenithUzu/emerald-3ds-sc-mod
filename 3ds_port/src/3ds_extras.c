@@ -218,7 +218,6 @@ static const char *const sPauseDimming[] = {"15%", "30%", "45%", "60%", "75%"};
 const CtrExtra gCtrExtras[] =
 {
     {CTR_EXTRAS_SCREEN(CTR_EXTRAS_OPTIONS, 1), CTR_TEXT("SINGLE SCREEN", "PANTALLA ÚNICA", "ÉCRAN UNIQUE", "SCHERMO UNICO", "TELA ÚNICA", "EIN BILDSCHIRM", "1がめん"), "mod_single_screen", 2, 1, gCtrExtrasOffOn, NULL, NULL, NULL},
-    {CTR_EXTRAS_SCREEN(CTR_EXTRAS_OPTIONS, 1), CTR_TEXT("TOUCH ON TOP", "TÁCTIL ARRIBA", "TACTILE EN HAUT", "TOCCO IN ALTO", "TOQUE EM CIMA", "TOUCH OBEN", "うえの タッチ"), "mod_touch_top", 2, 1, gCtrExtrasOffOn, NULL, NULL, NULL},
     {CTR_EXTRAS_SCREEN(CTR_EXTRAS_OPTIONS, 1), CTR_TEXT("PAUSE MENU", "MENÚ DE PAUSA", "MENU PAUSE", "MENU PAUSA", "MENU PAUSA", "PAUSENMENÜ", "ポーズ メニュー"), "mod_pause_ui", 3, 0, sPauseStyles, NULL, NULL, NULL},
     {CTR_EXTRAS_SCREEN(CTR_EXTRAS_OPTIONS, 1), CTR_TEXT("BATTLE UI", "INTERFAZ COMBATE", "UI COMBAT", "UI LOTTA", "UI BATALHA", "KAMPF UI", "バトル UI"), "mod_battle_ui", 2, 0, sBattleStyles, NULL, NULL, NULL},
     {CTR_EXTRAS_SCREEN(CTR_EXTRAS_OPTIONS, 1), CTR_TEXT("PAUSE DIM", "FONDO OSCURO", "FOND SOMBRE", "SFONDO SCURO", "FUNDO ESCURO", "ABDUNKELN", "はいけい"), "mod_pause_dim", 5, 2, sPauseDimming, NULL, NULL, NULL},

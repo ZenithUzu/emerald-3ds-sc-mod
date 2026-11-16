@@ -19,9 +19,6 @@
 
 /* Native side (libctru): copy columns [x0, x1) of the canvas to the screen. */
 void CtrBottom_Blit(const uint16_t *canvas, int x0, int x1);
-uint16_t *CtrBottom_Framebuffer(void);
-bool CtrBottom_EnableMirror(void);
-void CtrBottom_ReleaseMirror(void);
 /* Same, restricted to rows [y0, y1) of those columns. */
 void CtrBottom_BlitRect(const uint16_t *canvas, int x0, int y0, int x1, int y1);
 /* What the last Blit or BlitRect spent copying to the screen and flushing the
@@ -38,7 +35,7 @@ void CtrBottom_Frame(void);
 /* The visible companion panels for the single-screen layout. */
 bool CtrBottom_ShowOnTop(void);
 bool CtrBottom_PeekTop(void);
-enum { CTR_OVERLAY_NONE, CTR_OVERLAY_PAUSE, CTR_OVERLAY_BATTLE, CTR_OVERLAY_SHORTCUT };
+enum { CTR_OVERLAY_NONE, CTR_OVERLAY_PAUSE, CTR_OVERLAY_BATTLE };
 /* RGB565 canvas in LCD order, with zero pixels transparent. */
 unsigned CtrBottom_TopOverlay(const uint16_t **pixels, uint32_t *revision);
 /* The game's soft reset: forget the game it was in (back to the title's
